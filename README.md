@@ -1,2 +1,6 @@
 # DLC-Detector-with-Language-Customization
-这是我们工程学导论（ME1221）课程项目的版本管理仓库，本项目旨在实现一个基于CLIP的支持语义客制化的智能养老摄像头模块的硬件支持性开发、后端VLM开发以及前端开发。技术上，我们使用大规模语义预训练的CLIP模型，采用ViT作为视觉编码器，Vanilla Transformer作为语义编码器，zero-shot地进行场景识别，从而实现高度个性化的智能功能。
+这是我们 [工程学导论（ME1221）](https://oc.sjtu.edu.cn/courses/84663) 课程项目的版本管理仓库，本项目旨在实现一个基于CLIP的支持语义客制化的智能养老摄像头模块的硬件支持性开发、后端VLM开发以及前端开发。技术上，我们使用大规模语义预训练的CLIP模型，采用ViT作为视觉编码器，Vanilla Transformer作为语义编码器，zero-shot地进行场景识别，从而实现高度个性化的智能功能。
+
+![DLC全栈技术流程图]()
+
+***
