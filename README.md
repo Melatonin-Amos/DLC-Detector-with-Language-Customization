@@ -41,8 +41,7 @@
 
 TODO：
 
-- [ ] 实现infra
-- [ ] 写infra的文档
-- [x] 邀请jhy加入仓库
-- [ ] wuwuwuwawawa
-
+- [ ] 【1014/1015】实现infra
+- [ ] 【1016】技术对齐会议（课上）
+- [ ] 【1023左右】写infra的文档
+- [ ] 【Throughout】呜呜呜哇哇哇
