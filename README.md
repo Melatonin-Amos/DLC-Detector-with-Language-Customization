@@ -144,7 +144,6 @@ DLC-Detector-with-Language-Customization/
 │   └── USER_GUIDE.md             # 用户指南
 │
 ├── requirements.txt               # Python依赖
-├── setup.py                       # 安装脚本
 ├── main.py                        # 主程序入口
 └── README.md                      # 项目说明
 ```
