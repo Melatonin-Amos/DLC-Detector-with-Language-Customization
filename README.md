@@ -380,6 +380,12 @@ python main.py --source video --path assets/test_videos/fall_detection/test1.mp4
 TODO：
 
 - [x] 【1019前】实现infra
-- [ ] 【1023左右】技术对齐会议（课上）
 - [x] 【1023左右】写infra的文档
 - [x] 【Throughout】咕咕咕呜呜呜哇哇哇
+- [ ] 【1023左右】技术对齐会议（课上）
+- [ ] 采买工作
+- [ ] 背景 etc. 写作
+- [ ] [视频捕获模块](src/core/video_capture.py) → 调用detector.detect(frame)
+- [ ] [警报管理器](src/core/alert_manager.py) → 接收result字典
+- [ ] [主程序](main.py) → 整合所有模块
+
