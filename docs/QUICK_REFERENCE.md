@@ -29,10 +29,16 @@ git push origin [姓名拼音]_dev
 ```bash
 # 创建虚拟环境
 python -m venv venv
+# 或者，我更建议用conda管理
+conda create -n dlc python=3.10
+
 
 # 激活虚拟环境
 source venv/bin/activate  # Linux/Mac
 venv\Scripts\activate     # Windows
+# 或者，我更建议用conda管理
+conda activate dlc
+
 
 # 安装依赖
 pip install -r requirements.txt
