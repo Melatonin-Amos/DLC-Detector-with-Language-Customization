@@ -1,0 +1,71 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# PyTorch
+*.pth
+*.pt
+
+# Data and Models (大文件不上传)
+data/models/clip/*.pth
+data/models/clip/*.pt
+data/models/**/*.bin
+data/outputs/
+data/logs/*.log
+
+# Test Videos (可能包含隐私)
+assets/test_videos/**/*.mp4
+assets/test_videos/**/*.avi
+assets/test_videos/**/*.mov
+
+# RTSP配置（包含密码）
+assets/rtsp_streams/stream_configs.json
+
+# MacOS
+.DS_Store
+
+# Windows
+Thumbs.db
+desktop.ini
+
+# 临时文件
+*.tmp
+*.bak
+*.cache
+
+# 环境变量
+.env
+.env.local

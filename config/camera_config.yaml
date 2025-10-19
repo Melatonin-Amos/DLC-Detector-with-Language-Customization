@@ -1,0 +1,38 @@
+# 相机参数配置
+
+camera:
+  # 相机类型：rtsp 或 video
+  source_type: "rtsp"
+  
+  # RTSP流配置
+  rtsp:
+    # RTSP地址（从 assets/rtsp_streams/stream_configs.json 读取）
+    use_config_file: true
+    # 或直接指定URL
+    url: "rtsp://admin:password@192.168.1.64:554/Streaming/Channels/102"
+    # 连接超时（秒）
+    timeout: 10
+    # 重连尝试次数
+    retry_times: 3
+  
+  # 视频文件配置
+  video:
+    # 视频文件路径（相对于项目根目录）
+    path: "assets/test_videos/fall_detection/test1.mp4"
+    # 是否循环播放
+    loop: false
+  
+  # 相机参数（用于畸变矫正，可选）
+  calibration:
+    enabled: false
+    # 相机内参矩阵
+    camera_matrix: null
+    # 畸变系数
+    distortion_coeffs: null
+  
+  # 帧处理配置
+  frame:
+    # 目标分辨率（null表示使用原始分辨率）
+    target_resolution: null  # 例如: [1280, 720]
+    # 是否显示实时画面
+    show_preview: true
