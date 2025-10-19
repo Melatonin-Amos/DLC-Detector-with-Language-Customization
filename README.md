@@ -39,11 +39,353 @@
 
 ## \[JYY\] 项目 Infra 介绍
 
-首先，我（金抑扬）会在分配任务前完成代码的框架，下面是对于文件结构、代码功能的介绍。
+首先，我（金抑扬）会在分配任务前完成代码的框架，下面是对于文件结构、代码功能的介绍。下面的东西是**需要仔细看的**，在看完之后，可以把`main`分支的这个infra `merge`到**你的开发分支**，并且在本地读一读确切的文件结构、 代码框架。一些操作上、器物上的说明，可以参看[我准备的环境具体配置文档（建议conda，有问题随时群里问）](./docs/QUICK_REFERENCE.md)——要是这个过程让你极度痛苦，同样可以考虑转非开发角色——但是这个过程还是必要的，尤其对于后续的课程和科研而言（但是对大一来说确实太早，真诚不推荐很早进组——哎呀说开去了，总之下面的东西请好好读~）。
+
+### 1. 项目概述
+
+#### 1.1 核心功能
+
+**基础功能**：
+- ✅ 实时视频流读取与关键帧提取
+- ✅ 基于CLIP的语义客制化事件检测
+- ✅ 警报信息输出
+
+**拓展功能**：
+- 🔄 短信API警报通知
+- 🔄 隐私保护（视觉掩码）
+- 🔄 GUI前端界面
+- 🔄 场景迁移测试
+
+#### 1.2 输入源支持
+
+项目需要支持两类输入源，均存放在 `assets/` 文件夹下：
+
+1. **实时视频流** (`assets/rtsp_streams/`)
+   - 从海康威视相机模块读取RTSP协议流
+   - 支持不同分辨率（如720p, 1080p等）
+   - 实时抽取关键帧进行处理
+
+2. **离线视频文件** (`assets/test_videos/`)
+   - 预先录制的测试视频（mp4, avi等格式）
+   - 用于功能测试和效果展示
+   - 按固定帧率或场景变化抽取关键帧
+
+---
+
+### 2. 文件结构说明
+
+```
+DLC-Detector-with-Language-Customization/
+│
+├── assets/                          # 输入资源目录
+│   ├── rtsp_streams/               # RTSP实时流配置
+│   │   ├── stream_configs.json    # 流地址和参数配置
+│   │   └── README.md              # RTSP流使用说明
+│   └── test_videos/               # 测试视频文件
+│       ├── fall_detection/        # 跌倒检测测试视频
+│       ├── fire_detection/        # 火灾检测测试视频
+│       └── normal_scenarios/      # 正常场景视频
+│
+├── config/                         # 配置文件目录
+│   ├── camera_config.yaml         # 相机参数配置
+│   ├── model_config.yaml          # CLIP模型配置
+│   └── detection_config.yaml      # 检测阈值和场景配置
+│
+├── data/                          # 数据目录
+│   ├── logs/                      # 运行日志
+│   ├── models/                    # 预训练模型存放
+│   │   └── clip/                 # CLIP模型权重
+│   └── outputs/                   # 输出结果
+│       ├── alerts/               # 警报记录
+│       └── frames/               # 提取的关键帧
+│
+├── src/                           # 源代码目录
+│   ├── __init__.py
+│   │
+│   ├── core/                      # 核心功能模块
+│   │   ├── __init__.py
+│   │   ├── video_capture.py      # 视频捕获和关键帧提取
+│   │   ├── clip_detector.py      # CLIP模型检测器
+│   │   └── alert_manager.py      # 警报管理器
+│   │
+│   ├── models/                    # 模型相关
+│   │   ├── __init__.py
+│   │   ├── clip_wrapper.py       # CLIP模型封装
+│   │   └── vision_encoder.py     # 视觉编码器
+│   │
+│   ├── utils/                     # 工具函数
+│   │   ├── __init__.py
+│   │   ├── image_processing.py   # 图像预处理
+│   │   ├── config_loader.py      # 配置加载器
+│   │   └── logger.py             # 日志工具
+│   │
+│   └── alert/                     # 警报功能（拓展）
+│       ├── __init__.py
+│       ├── sms_sender.py         # 短信发送
+│       └── notification.py        # 通知管理
+│
+├── scripts/                       # 脚本目录
+│   ├── download_models.py        # 下载预训练模型
+│   ├── test_camera.py            # 测试相机连接
+│   └── run_demo.py               # 运行演示
+│
+├── tests/                         # 测试代码
+│   ├── test_video_capture.py    # 视频捕获测试
+│   ├── test_clip_detector.py    # 检测器测试
+│   └── test_integration.py       # 集成测试
+│
+├── gui/                           # GUI界面（拓展）
+│   ├── __init__.py
+│   ├── main_window.py            # 主窗口
+│   └── settings_panel.py         # 设置面板
+│
+├── docs/                          # 文档目录
+│   ├── API.md                    # API文档
+│   └── USER_GUIDE.md             # 用户指南
+│
+├── requirements.txt               # Python依赖
+├── main.py                        # 主程序入口
+└── README.md                      # 项目说明
+```
+
+### 3. 技术实现方案
+
+#### 3.1 视频捕获与关键帧提取
+
+**输入源处理**：
+
+```python
+# 伪代码示意
+class VideoCapture:
+    def __init__(self, source_type, source_path):
+        """
+        source_type: 'rtsp' 或 'video'
+        source_path: RTSP URL 或 视频文件路径
+        """
+        pass
+    
+    def get_frame(self):
+        """获取下一帧"""
+        pass
+    
+    def extract_keyframes(self, method='interval'):
+        """
+        提取关键帧
+        method: 'interval' (固定间隔) 或 'scene' (场景变化)
+        """
+        pass
+```
+
+**关键帧提取策略**：
+
+1. **固定间隔法**（优先实现）
+   - 每隔N帧提取一帧（N可配置，建议30-60）
+   - 优点：简单高效
+   - 缺点：可能错过短暂事件
+
+2. **场景变化检测法**（可选优化，怪复杂的，我（金抑扬）不是很建议）
+   - 计算相邻帧的差异（如直方图差异）
+   - 超过阈值则认为场景变化，提取关键帧
+   - 优点：更智能，不会遗漏重要时刻
+   - 缺点：计算量稍大
+
+---
+
+#### 3.2 CLIP模型集成
+
+**模型选择**：
+- **OpenAI CLIP**: `openai/clip-vit-base-patch32`
+- **OpenCLIP**: `laion/CLIP-ViT-B-32-laion2B-s34B-b79K` (更大规模预训练)
+
+**检测流程**：
+
+```python
+# 伪代码示意
+class CLIPDetector:
+    def __init__(self, model_name):
+        self.model = load_clip_model(model_name)
+        self.processor = load_clip_processor()
+    
+    def detect(self, image, text_prompts, threshold=0.25):
+        """
+        image: PIL Image 或 numpy array
+        text_prompts: List[str], 如 ["a person falling down", "a fire"]
+        threshold: 相似度阈值
+        
+        返回: Dict[str, float] - {场景: 相似度分数}
+        """
+        # 1. 图像编码
+        image_features = self.encode_image(image)
+        
+        # 2. 文本编码
+        text_features = self.encode_text(text_prompts)
+        
+        # 3. 计算余弦相似度
+        similarities = cosine_similarity(image_features, text_features)
+        
+        # 4. 判断是否超过阈值
+        results = {}
+        for i, prompt in enumerate(text_prompts):
+            if similarities[i] > threshold:
+                results[prompt] = similarities[i]
+        
+        return results
+```
+
+**文本提示词设计**：
+
+| 场景 | 英文提示词 | 中文提示词（参考） |
+|------|-----------|-------------------|
+| 跌倒 | "a person falling down", "an elderly person fallen on the ground" | 一个人摔倒了，老人倒在地上 |
+| 火灾 | "fire in a room", "flames and smoke" | 房间里着火了，火焰和烟雾 |
+| 水淹 | "floor covered with water", "flooding indoors" | 地板被水覆盖，室内淹水 |
+| 正常 | "a person standing normally", "everyday home scene" | 人正常站立，日常家庭场景 |
+
+**优化技巧**：
+- 使用多个相似提示词取平均值，提高鲁棒性
+- 引入"正常场景"作为对照，使用对比分数判断异常
+
+---
+
+#### 3.3 警报管理
+
+**警报策略**：
+
+```python
+class AlertManager:
+    def __init__(self, config):
+        self.thresholds = config['thresholds']
+        self.alert_history = []
+        self.cooldown_time = 30  # 冷却时间（秒）
+    
+    def should_alert(self, detection_results):
+        """
+        避免重复警报：
+        - 同一场景在冷却时间内不重复警报
+        - 连续N帧检测到才触发（可选）
+        """
+        pass
+    
+    def trigger_alert(self, scene, confidence):
+        """
+        触发警报：
+        - 打印到终端
+        - 记录到日志
+        - 发送短信（如果启用）
+        """
+        pass
+```
+
+---
+
+#### 3.4 配置文件设计
+
+**`config/detection_config.yaml`**:
+
+```yaml
+detection:
+  # 检测场景配置
+  scenarios:
+    fall:
+      enabled: true
+      prompts:
+        - "a person falling down"
+        - "an elderly person fallen on the ground"
+      threshold: 0.25
+      cooldown: 30  # 秒
+    
+    fire:
+      enabled: true
+      prompts:
+        - "fire in a room"
+        - "flames and smoke"
+      threshold: 0.30
+      cooldown: 60
+  
+  # 关键帧提取
+  keyframe:
+    method: "interval"  # interval 或 scene
+    interval: 30  # 每30帧提取一次
+    scene_threshold: 0.3  # 场景变化阈值
+
+# 警报配置
+alert:
+  print_to_console: true
+  save_to_log: true
+  sms_enabled: false  # 拓展功能
+  sms_contacts:
+    - "+86138XXXXXXXX"
+```
+### 4. 开发与使用规范
+
+#### 4.1 代码规范
+
+- **编码标准**: PEP 8
+- **命名规范**:
+  - 类名: `PascalCase`
+  - 函数/变量: `snake_case`
+  - 常量: `UPPER_CASE`
+- **注释要求**:
+  - 每个函数必须有docstring
+  - 复杂逻辑必须有行内注释
+- **类型提示**: 推荐使用Python类型注解
+
+#### 4.2 预想中的快速开始（显然现在还没有实现完，开始不了一点）
+
+##### 4.2.1 环境搭建
+
+```bash
+# 1. 克隆仓库
+git clone <repo-url>
+cd DLC-Detector-with-Language-Customization
+
+# 2. 创建虚拟环境
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+# venv\Scripts\activate  # Windows
+
+# 3. 安装依赖
+pip install -r requirements.txt
+
+# 4. 下载CLIP模型
+python scripts/download_models.py
+```
+
+##### 4.2.2 运行测试
+
+```bash
+# 测试相机连接
+python scripts/test_camera.py
+
+# 运行demo
+python scripts/run_demo.py --source video --path assets/test_videos/fall_detection/test1.mp4
+```
+
+##### 4.2.3 运行主程序
+
+```bash
+# 使用RTSP流
+python main.py --source rtsp --config config/detection_config.yaml
+
+# 使用测试视频
+python main.py --source video --path assets/test_videos/fall_detection/test1.mp4
+```
+
+---
+
+- 一些小小的教程
+  - CLIP实践教程: https://huggingface.co/docs/transformers/model_doc/clip
+  - OpenCV视频处理: https://docs.opencv.org/4.x/dd/d43/tutorial_py_video_display.html
 
 TODO：
 
-- [ ] 【1019前】实现infra
-- [ ] 【1016】技术对齐会议（课上）
-- [ ] 【1023左右】写infra的文档
-- [ ] 【Throughout】呜呜呜哇哇哇
+- [x] 【1019前】实现infra
+- [x] 【1023左右】写infra的文档
+- [x] 【Throughout】咕咕咕呜呜呜哇哇哇
+- [ ] 【1023左右】技术对齐会议（课上）
+- [ ] 采买工作
+- [ ] 背景 etc. 写作
+- [ ] [视频捕获模块](src/core/video_capture.py) → 调用detector.detect(frame)
+- [ ] [警报管理器](src/core/alert_manager.py) → 接收result字典
+- [ ] [主程序](main.py) → 整合所有模块
+
