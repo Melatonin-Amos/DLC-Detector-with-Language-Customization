@@ -1,0 +1,32 @@
+# CLIP模型配置
+
+model:
+  # 模型名称
+  name: "ViT-B/32"  # 可选: ViT-B/32, ViT-B/16, ViT-L/14
+  
+  # 模型来源
+  source: "openai"  # openai 或 laion
+  
+  # 模型存储路径
+  model_dir: "data/models/clip"
+  
+  # 设备配置
+  device: "auto"  # auto, cpu, cuda, cuda:0
+  
+  # 预处理配置
+  preprocessing:
+    # 图像大小（根据模型自动设置）
+    image_size: 224
+    # 归一化参数（CLIP标准）
+    normalize:
+      mean: [0.48145466, 0.4578275, 0.40821073]
+      std: [0.26862954, 0.26130258, 0.27577711]
+  
+  # 推理配置
+  inference:
+    # 批处理大小
+    batch_size: 1
+    # 是否使用混合精度（fp16）
+    use_fp16: false
+    # 温度参数（用于缩放相似度）
+    temperature: 1.0
