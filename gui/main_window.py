@@ -10,8 +10,9 @@
 # - MainWindow: 主窗口类
 #
 # 开发优先级：⭐ (第10-11周完成)
-
+import os
 import tkinter as tk
+from PIL import Image, ImageTk
 # 创建主窗口
 root = tk.Tk()
 root.title("主窗口 - 实时视频预览与检测")
@@ -33,7 +34,8 @@ root.geometry(f"{width}x{height}+{x}+{y}")
 #锁定长宽比
 root.resizable(False, False)
 # 改一个可爱滴图标
-root.iconbitmap('kawaii_icon.ico')
+icon = Image.open("kawaii_icon.png")
+root.wm_iconphoto(True, ImageTk.PhotoImage(icon))
 
 root.mainloop()
 
