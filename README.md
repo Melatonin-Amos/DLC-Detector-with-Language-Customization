@@ -1,4 +1,7 @@
 # DLC-Detector-with-Language-Customization
+
+> Happy Programmer Day (10/24) !
+
 这是我们 [工程学导论（ME1221）](https://oc.sjtu.edu.cn/courses/84663) 课程项目的版本管理仓库，本项目旨在实现一个基于CLIP的支持语义客制化的智能养老摄像头模块的硬件支持性开发、后端VLM开发以及前端开发。技术上，我们使用大规模语义预训练的CLIP模型，采用ViT作为视觉编码器，Vanilla Transformer作为语义编码器，zero-shot地进行场景识别，从而实现高度个性化的智能功能。
 
 ![DLC全栈技术流程图](./doc_asset/image/DLC.png)
@@ -23,6 +26,7 @@ TODO：
 - [ ] [视频捕获模块](src/core/video_capture.py) → 调用detector.detect(frame)
 - [ ] [警报管理器](src/core/alert_manager.py) → 接收result字典
 - [ ] [主程序](main.py) → 整合所有模块
+
 
 
 ## 写在前面：环境配置与基础构建
