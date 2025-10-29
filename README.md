@@ -1,4 +1,5 @@
 # DLC-Detector-with-Language-Customization
+
 这是我们 [工程学导论（ME1221）](https://oc.sjtu.edu.cn/courses/84663) 课程项目的版本管理仓库，本项目旨在实现一个基于CLIP的支持语义客制化的智能养老摄像头模块的硬件支持性开发、后端VLM开发以及前端开发。技术上，我们使用大规模语义预训练的CLIP模型，采用ViT作为视觉编码器，Vanilla Transformer作为语义编码器，zero-shot地进行场景识别，从而实现高度个性化的智能功能。
 
 ![DLC全栈技术流程图](./doc_asset/image/DLC.png)
@@ -16,13 +17,14 @@ TODO：
 - 【周度进度安排】1030课前
   - [ ] （**wty**）本周参考课件/建议书/课上说明购买：摄像头、摄像头架（预算300元左右，注意问老师报销规范，注意确保支持编程，尽量不要退货/重买），下周尽量带来课堂。
   - [ ] （**whk**）参考项目建议书进行背景等非技术部分的写作构思。
-  - [ ] （**whk、wty**）假如有意愿进行开发，请按照本README文件的“第一步”“第二步”“第三步”进行环境配置与基础构建（关键节点：conda的完善、Copilot可以显示高级模型，创建自己的开发branch），从而支持后续的开发，在这个过程中如果遇到困难甚至痛苦，不用勉强/坐牢，是整个过程比较顺利，下周可以讨论各自负责的开发部分。
+  - [ ] （**whk、wty**）假如有意愿进行开发，请按照本README文件的“第一步”“第二步”“第三步”进行环境配置与基础构建（关键节点：conda的完善、Copilot可以显示高级模型，创建自己的开发branch），从而支持后续的开发，在这个过程中如果遇到困难甚至感受到痛苦，不用勉强/坐牢，要是整个过程比较顺利，下周可以讨论各自负责的开发部分。我们的宗旨是***不要感受到坐牢**（非常真诚的），要是能开发当然欢迎，要是感觉太累了完全没必要硬撑。
   - [ ] （**lxr**）对于前端与GUI的实现进行初步尝试与技术调研，在下周形成比较明确的想法和设计思路。
   - [ ] （**jhy**）对于Pytorch、NLP、Vanilla Transformer进行回顾与熟悉，掌握项目Pipeline，构思相机支持性开发。
   - [ ] （**jyy**）尝试对现有的CLIP（ViT + Vanilla Transformer）实现进行进一步厘清，完善现有的接口和注册，支持两端的开发。
 - [ ] [视频捕获模块](src/core/video_capture.py) → 调用detector.detect(frame)
 - [ ] [警报管理器](src/core/alert_manager.py) → 接收result字典
 - [ ] [主程序](main.py) → 整合所有模块
+
 
 
 ## 写在前面：环境配置与基础构建
@@ -216,6 +218,15 @@ class VideoCapture:
 **模型选择**：
 - **OpenAI CLIP**: `openai/clip-vit-base-patch32`
 - **OpenCLIP**: `laion/CLIP-ViT-B-32-laion2B-s34B-b79K` (更大规模预训练)
+
+**快速了解原理**：
+
+- [快速了解Transformer（但是视频中有一处错误）](https://www.bilibili.com/video/BV1dyW9zsEk1?vd_source=fea757cded14707bcd60c2e78d0c58ba)
+- [稍微慢速一点了解Transformer](https://www.bilibili.com/video/BV1xoJwzDESD?vd_source=fea757cded14707bcd60c2e78d0c58ba)
+- [快速了解ViT及其在VLM中的作用](https://www.bilibili.com/video/BV1gnWdzSEzY?spm_id_from=333.788.recommend_more_video.0&trackid=web_related_0.router-related-2206146-5nk2d.1761735178765.390&vd_source=d6c101018355a1105cd81c932cad93c4)
+- [再稍微慢速一点了解Transformer（9个视频）](https://www.youtube.com/watch?v=aircAruvnKk&list=PLZHQObOWTQDNU6R1_67000Dx_ZCJB-3pi)
+
+更详细的了解建议学习《动手学深度学习》全书（以及一些更加前置的教程）后去读原论文，预计需要三个月到一年的课余时间，不用着急，这并不适合本课程项目的进度设置。这里只是进行一些陈列，以飨感到好奇的同学。
 
 **检测流程**：
 
