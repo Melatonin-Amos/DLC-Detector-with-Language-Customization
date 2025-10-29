@@ -221,6 +221,15 @@ class VideoCapture:
 - **OpenAI CLIP**: `openai/clip-vit-base-patch32`
 - **OpenCLIP**: `laion/CLIP-ViT-B-32-laion2B-s34B-b79K` (更大规模预训练)
 
+**快速了解原理**：
+
+- [快速了解Transformer（但是视频中有一处错误）](https://www.bilibili.com/video/BV1dyW9zsEk1?vd_source=fea757cded14707bcd60c2e78d0c58ba)
+- [稍微慢速一点了解Transformer](https://www.bilibili.com/video/BV1xoJwzDESD?vd_source=fea757cded14707bcd60c2e78d0c58ba)
+- [快速了解ViT及其在VLM中的作用](https://www.bilibili.com/video/BV1gnWdzSEzY?spm_id_from=333.788.recommend_more_video.0&trackid=web_related_0.router-related-2206146-5nk2d.1761735178765.390&vd_source=d6c101018355a1105cd81c932cad93c4)
+- [再稍微慢速一点了解Transformer（9个视频）](https://www.youtube.com/watch?v=aircAruvnKk&list=PLZHQObOWTQDNU6R1_67000Dx_ZCJB-3pi)
+
+更详细的了解建议学习《动手学深度学习》全书（以及一些更加前置的教程）后去读原论文，预计需要三个月到一年的课余时间，不用着急，这并不适合本课程项目的进度设置。这里只是进行一些陈列，以飨感到好奇的同学。
+
 **检测流程**：
 
 ```python
