@@ -111,6 +111,26 @@ class SettingsPanel:
         self.content_container.grid_rowconfigure(0, weight=1)
         self.content_container.grid_columnconfigure(0, weight=1)
 
+    def _center_window(self, window: tk.Toplevel, width: int, height: int) -> None:
+        """
+        将窗口居中显示在屏幕上
+
+        Args:
+            window: 要居中的窗口
+            width: 窗口宽度
+            height: 窗口高度
+        """
+        # 获取屏幕尺寸
+        screen_width = window.winfo_screenwidth()
+        screen_height = window.winfo_screenheight()
+
+        # 计算居中位置
+        center_x = int((screen_width - width) / 2)
+        center_y = int((screen_height - height) / 2)
+
+        # 设置窗口位置
+        window.geometry(f"{width}x{height}+{center_x}+{center_y}")
+
     def _create_pages(self) -> None:
         """创建所有设置页面"""
         # 创建RTSP流配置页面
@@ -373,21 +393,25 @@ class SettingsPanel:
         # 创建对话框窗口
         dialog = tk.Toplevel(self.parent)
         dialog.title("新建场景")
-        dialog.geometry("400x200")
         dialog.resizable(False, False)
 
-        # 居中显示
+        # 设置窗口大小并居中显示
+        dialog_width = 480
+        dialog_height = 280
+        self._center_window(dialog, dialog_width, dialog_height)
+
+        # 设置为模态窗口
         dialog.transient(self.parent)
         dialog.grab_set()
 
         # 创建输入框架
-        input_frame = ttk.Frame(dialog, padding="20")
+        input_frame = ttk.Frame(dialog, padding="30")
         input_frame.pack(fill=tk.BOTH, expand=True)
 
         # 说明标签
-        ttk.Label(input_frame, text="请输入新场景的名称：", font=("Arial", 11)).pack(
-            pady=(10, 15)
-        )
+        ttk.Label(
+            input_frame, text="请输入新场景的名称：", font=("Arial", 12, "bold")
+        ).pack(pady=(10, 20))
 
         # 场景名称输入框
         scene_name_var = tk.StringVar()
@@ -403,7 +427,7 @@ class SettingsPanel:
             text="例如：跌倒、起火、闯入等",
             font=("Arial", 9),
             foreground="gray",
-        ).pack(pady=(0, 20))
+        ).pack(pady=(0, 30))
 
         def on_confirm():
             """确认创建"""
@@ -440,17 +464,17 @@ class SettingsPanel:
             """取消创建"""
             dialog.destroy()
 
-        # 按钮框架
+        # 按钮框架（居中）
         button_frame = ttk.Frame(input_frame)
-        button_frame.pack(fill=tk.X)
+        button_frame.pack(pady=(10, 0))
 
-        ttk.Button(button_frame, text="确定", command=on_confirm, width=12).pack(
-            side=tk.LEFT, padx=(0, 10)
-        )
+        ttk.Button(
+            button_frame, text="✓ 确定", command=on_confirm, width=15, padding=8
+        ).pack(side=tk.LEFT, padx=10)
 
-        ttk.Button(button_frame, text="取消", command=on_cancel, width=12).pack(
-            side=tk.LEFT
-        )
+        ttk.Button(
+            button_frame, text="✕ 取消", command=on_cancel, width=15, padding=8
+        ).pack(side=tk.LEFT, padx=10)
 
         # 绑定回车键
         name_entry.bind("<Return>", lambda e: on_confirm())

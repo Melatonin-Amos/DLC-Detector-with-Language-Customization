@@ -103,6 +103,26 @@ class MainWindow:
         except Exception as e:
             print(f"无法加载图标: {e}")
 
+    def _center_window(self, window: tk.Toplevel, width: int, height: int) -> None:
+        """
+        将窗口居中显示在屏幕上
+
+        Args:
+            window: 要居中的窗口
+            width: 窗口宽度
+            height: 窗口高度
+        """
+        # 获取屏幕尺寸
+        screen_width = window.winfo_screenwidth()
+        screen_height = window.winfo_screenheight()
+
+        # 计算居中位置
+        center_x = int((screen_width - width) / 2)
+        center_y = int((screen_height - height) / 2)
+
+        # 设置窗口位置
+        window.geometry(f"{width}x{height}+{center_x}+{center_y}")
+
     def _create_widgets(self) -> None:
         """创建所有GUI组件"""
         # 创建主框架
@@ -291,24 +311,28 @@ class MainWindow:
         # 弹出选择对话框：RTSP流 或 本地摄像头
         choice_dialog = tk.Toplevel(self.root)
         choice_dialog.title("选择视频源")
-        choice_dialog.geometry("400x200")
         choice_dialog.resizable(False, False)
 
-        # 居中显示
+        # 设置窗口大小并居中显示
+        dialog_width = 500
+        dialog_height = 250
+        self._center_window(choice_dialog, dialog_width, dialog_height)
+
+        # 设置为模态窗口
         choice_dialog.transient(self.root)
         choice_dialog.grab_set()
 
         # 创建选择框架
-        frame = ttk.Frame(choice_dialog, padding="20")
+        frame = ttk.Frame(choice_dialog, padding="30")
         frame.pack(fill=tk.BOTH, expand=True)
 
-        ttk.Label(frame, text="请选择视频源类型:", font=("Arial", 12)).pack(
-            pady=(0, 20)
+        ttk.Label(frame, text="请选择视频源类型:", font=("Arial", 14, "bold")).pack(
+            pady=(10, 30)
         )
 
         # 按钮容器
         button_frame = ttk.Frame(frame)
-        button_frame.pack(expand=True)
+        button_frame.pack(expand=True, pady=(0, 20))
 
         def on_camera():
             choice_dialog.destroy()
@@ -331,12 +355,12 @@ class MainWindow:
                 messagebox.showwarning("警告", "未设置RTSP地址")
 
         ttk.Button(
-            button_frame, text="📷 本地摄像头", command=on_camera, width=20
-        ).pack(side=tk.LEFT, padx=10)
+            button_frame, text="📷 本地摄像头", command=on_camera, width=22, padding=10
+        ).pack(side=tk.LEFT, padx=15)
 
-        ttk.Button(button_frame, text="📡 RTSP网络流", command=on_rtsp, width=20).pack(
-            side=tk.LEFT, padx=10
-        )
+        ttk.Button(
+            button_frame, text="📡 RTSP网络流", command=on_rtsp, width=22, padding=10
+        ).pack(side=tk.LEFT, padx=15)
 
     def _on_pause(self) -> None:
         """暂停按钮回调"""
