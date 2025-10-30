@@ -13,10 +13,11 @@
 
 import sys
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, messagebox
 from typing import Dict, Optional
 from PIL import Image, ImageTk
 import cv2
+import numpy as np
 from settings_panel import SettingsPanel
 
 
@@ -57,6 +58,13 @@ class MainWindow:
 
         # 设置窗口引用
         self.settings_window: Optional[tk.Toplevel] = None
+
+        # 视频流相关变量
+        self.video_capture: Optional[cv2.VideoCapture] = None
+        self.is_playing: bool = False
+        self.is_paused: bool = False
+        self.rtsp_url: str = ""
+        self.update_id: Optional[str] = None  # 用于存储after的返回ID
 
         # 初始化GUI组件，在init时自动调用
         self._setup_window()
@@ -270,18 +278,57 @@ class MainWindow:
 
     def _on_start_detection(self) -> None:
         """开始检测按钮回调"""
-        print("开始检测...")
-        # TODO: 实现检测逻辑
+        if self.is_playing and not self.is_paused:
+            messagebox.showinfo("提示", "视频流已在播放中")
+            return
+
+        # 如果是暂停状态，则恢复播放
+        if self.is_paused:
+            self.is_paused = False
+            print("恢复播放...")
+            return
+
+        # 获取RTSP URL（优先从设置面板获取，否则使用默认或提示输入）
+        if not self.rtsp_url:
+            # 简单对话框获取RTSP URL
+            from tkinter import simpledialog
+
+            self.rtsp_url = simpledialog.askstring(
+                "RTSP设置",
+                "请输入RTSP流地址:",
+                initialvalue="rtsp://admin:password@192.168.1.100:554/stream",
+            )
+
+            if not self.rtsp_url:
+                messagebox.showwarning("警告", "未设置RTSP地址")
+                return
+
+        # 启动视频流
+        self._start_video_stream()
 
     def _on_pause(self) -> None:
         """暂停按钮回调"""
-        print("暂停检测...")
-        # TODO: 实现暂停逻辑
+        if not self.is_playing:
+            messagebox.showinfo("提示", "当前没有视频在播放")
+            return
+
+        if self.is_paused:
+            # 恢复播放
+            self.is_paused = False
+            print("恢复播放...")
+        else:
+            # 暂停播放
+            self.is_paused = True
+            print("暂停播放...")
 
     def _on_stop(self) -> None:
         """停止按钮回调"""
-        print("停止检测...")
-        # TODO: 实现停止逻辑
+        if not self.is_playing:
+            messagebox.showinfo("提示", "当前没有视频在播放")
+            return
+
+        print("停止视频流...")
+        self._stop_video_stream()
 
     def _on_settings(self) -> None:
         """设置按钮回调"""
@@ -328,9 +375,184 @@ class MainWindow:
 
         self.settings_window.protocol("WM_DELETE_WINDOW", on_settings_close)
 
+    def _start_video_stream(self) -> None:
+        """启动视频流"""
+        try:
+            # 释放之前的视频捕获对象
+            if self.video_capture is not None:
+                self.video_capture.release()
+
+            # 创建新的视频捕获对象
+            print(f"正在连接RTSP流: {self.rtsp_url}")
+            self.video_capture = cv2.VideoCapture(self.rtsp_url)
+
+            # 设置缓冲区大小，减少延迟
+            self.video_capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+
+            # 检查是否成功打开
+            if not self.video_capture.isOpened():
+                messagebox.showerror("错误", f"无法连接到RTSP流:\n{self.rtsp_url}")
+                self.video_capture = None
+                return
+
+            # 标记为播放状态
+            self.is_playing = True
+            self.is_paused = False
+
+            # 清除占位文字
+            self.video_canvas.delete(self.placeholder_text)
+
+            # 开始更新视频帧
+            self._update_video_frame()
+
+            print("视频流已启动")
+
+        except Exception as e:
+            messagebox.showerror("错误", f"启动视频流失败:\n{str(e)}")
+            print(f"启动视频流错误: {e}")
+            self.is_playing = False
+
+    def _stop_video_stream(self) -> None:
+        """停止视频流"""
+        try:
+            self.is_playing = False
+            self.is_paused = False
+
+            # 取消定时更新
+            if self.update_id is not None:
+                self.root.after_cancel(self.update_id)
+                self.update_id = None
+
+            # 释放视频捕获对象
+            if self.video_capture is not None:
+                self.video_capture.release()
+                self.video_capture = None
+
+            # 清空画布
+            self.video_canvas.delete("all")
+
+            # 重新显示占位文字
+            canvas_width = self.video_canvas.winfo_width()
+            canvas_height = self.video_canvas.winfo_height()
+            self.placeholder_text = self.video_canvas.create_text(
+                canvas_width // 2,
+                canvas_height // 2,
+                text="等待视频输入...\n\n点击下方按钮开始检测",
+                font=("Arial", 16),
+                fill="#888888",
+                justify="center",
+            )
+
+            print("视频流已停止")
+
+        except Exception as e:
+            print(f"停止视频流错误: {e}")
+
+    def _update_video_frame(self) -> None:
+        """更新视频帧"""
+        if not self.is_playing or self.video_capture is None:
+            return
+
+        try:
+            # 如果暂停，则不读取新帧，但继续调度
+            if not self.is_paused:
+                ret, frame = self.video_capture.read()
+
+                if ret:
+                    # 转换颜色空间 (BGR -> RGB)
+                    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+                    # 获取画布尺寸
+                    canvas_width = self.video_canvas.winfo_width()
+                    canvas_height = self.video_canvas.winfo_height()
+
+                    # 调整帧大小以适应画布
+                    frame_resized = self._resize_frame(
+                        frame_rgb, canvas_width, canvas_height
+                    )
+
+                    # 转换为PIL图像
+                    image = Image.fromarray(frame_resized)
+                    photo = ImageTk.PhotoImage(image=image)
+
+                    # 更新画布
+                    self.video_canvas.delete("all")
+                    self.video_canvas.create_image(
+                        canvas_width // 2,
+                        canvas_height // 2,
+                        image=photo,
+                        anchor=tk.CENTER,
+                    )
+
+                    # 保持引用，防止被垃圾回收
+                    self.video_canvas.image = photo
+
+                else:
+                    # 读取失败，可能是流断开
+                    print("视频流读取失败，尝试重新连接...")
+                    self._stop_video_stream()
+                    messagebox.showwarning("警告", "视频流连接中断")
+                    return
+
+            # 继续调度下一帧更新（约30fps）
+            self.update_id = self.root.after(33, self._update_video_frame)
+
+        except Exception as e:
+            print(f"更新视频帧错误: {e}")
+            self._stop_video_stream()
+            messagebox.showerror("错误", f"视频播放出错:\n{str(e)}")
+
+    def _resize_frame(
+        self, frame: np.ndarray, canvas_width: int, canvas_height: int
+    ) -> np.ndarray:
+        """
+        调整视频帧大小以适应画布，保持宽高比
+
+        Args:
+            frame: 原始视频帧
+            canvas_width: 画布宽度
+            canvas_height: 画布高度
+
+        Returns:
+            调整后的视频帧
+        """
+        frame_height, frame_width = frame.shape[:2]
+
+        # 计算缩放比例
+        width_ratio = canvas_width / frame_width
+        height_ratio = canvas_height / frame_height
+        scale_ratio = min(width_ratio, height_ratio)
+
+        # 计算新尺寸
+        new_width = int(frame_width * scale_ratio)
+        new_height = int(frame_height * scale_ratio)
+
+        # 调整大小
+        resized_frame = cv2.resize(
+            frame, (new_width, new_height), interpolation=cv2.INTER_AREA
+        )
+
+        # 创建黑色背景
+        output = np.zeros((canvas_height, canvas_width, 3), dtype=np.uint8)
+
+        # 计算居中位置
+        y_offset = (canvas_height - new_height) // 2
+        x_offset = (canvas_width - new_width) // 2
+
+        # 将调整后的帧放置在中心
+        output[y_offset : y_offset + new_height, x_offset : x_offset + new_width] = (
+            resized_frame
+        )
+
+        return output
+
     def _on_window_close(self) -> None:
         """窗口关闭事件处理器"""
         try:
+            # 停止视频流
+            self._stop_video_stream()
+
+            # 关闭窗口
             self.root.quit()
             self.root.destroy()
         finally:
