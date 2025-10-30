@@ -288,8 +288,35 @@ class MainWindow:
             print("恢复播放...")
             return
 
-        # 获取RTSP URL（优先从设置面板获取，否则使用默认或提示输入）
-        if not self.rtsp_url:
+        # 弹出选择对话框：RTSP流 或 本地摄像头
+        choice_dialog = tk.Toplevel(self.root)
+        choice_dialog.title("选择视频源")
+        choice_dialog.geometry("400x200")
+        choice_dialog.resizable(False, False)
+
+        # 居中显示
+        choice_dialog.transient(self.root)
+        choice_dialog.grab_set()
+
+        # 创建选择框架
+        frame = ttk.Frame(choice_dialog, padding="20")
+        frame.pack(fill=tk.BOTH, expand=True)
+
+        ttk.Label(frame, text="请选择视频源类型:", font=("Arial", 12)).pack(
+            pady=(0, 20)
+        )
+
+        # 按钮容器
+        button_frame = ttk.Frame(frame)
+        button_frame.pack(expand=True)
+
+        def on_camera():
+            choice_dialog.destroy()
+            self.rtsp_url = "0"  # 使用摄像头ID
+            self._start_video_stream()
+
+        def on_rtsp():
+            choice_dialog.destroy()
             # 简单对话框获取RTSP URL
             from tkinter import simpledialog
 
@@ -298,13 +325,18 @@ class MainWindow:
                 "请输入RTSP流地址:",
                 initialvalue="rtsp://admin:password@192.168.1.100:554/stream",
             )
-
-            if not self.rtsp_url:
+            if self.rtsp_url:
+                self._start_video_stream()
+            else:
                 messagebox.showwarning("警告", "未设置RTSP地址")
-                return
 
-        # 启动视频流
-        self._start_video_stream()
+        ttk.Button(
+            button_frame, text="📷 本地摄像头", command=on_camera, width=20
+        ).pack(side=tk.LEFT, padx=10)
+
+        ttk.Button(button_frame, text="📡 RTSP网络流", command=on_rtsp, width=20).pack(
+            side=tk.LEFT, padx=10
+        )
 
     def _on_pause(self) -> None:
         """暂停按钮回调"""
@@ -376,22 +408,40 @@ class MainWindow:
         self.settings_window.protocol("WM_DELETE_WINDOW", on_settings_close)
 
     def _start_video_stream(self) -> None:
-        """启动视频流"""
+        """
+        启动视频流
+
+        流程：
+        1. OpenCV打开摄像头/RTSP流 (cv2.VideoCapture)
+        2. 读取视频帧
+        3. BGR → RGB 转换 (cv2.cvtColor)
+        4. 转换为 PIL.Image → ImageTk.PhotoImage
+        5. Tkinter Canvas 显示图像
+        """
         try:
             # 释放之前的视频捕获对象
             if self.video_capture is not None:
                 self.video_capture.release()
 
-            # 创建新的视频捕获对象
-            print(f"正在连接RTSP流: {self.rtsp_url}")
-            self.video_capture = cv2.VideoCapture(self.rtsp_url)
+            # 判断是摄像头还是RTSP流
+            if self.rtsp_url == "0":
+                # 本地摄像头
+                print("正在打开本地摄像头...")
+                self.video_capture = cv2.VideoCapture(0)  # 0 表示默认摄像头
+            else:
+                # RTSP网络流
+                print(f"正在连接RTSP流: {self.rtsp_url}")
+                self.video_capture = cv2.VideoCapture(self.rtsp_url)
 
             # 设置缓冲区大小，减少延迟
             self.video_capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
             # 检查是否成功打开
             if not self.video_capture.isOpened():
-                messagebox.showerror("错误", f"无法连接到RTSP流:\n{self.rtsp_url}")
+                source_type = "摄像头" if self.rtsp_url == "0" else "RTSP流"
+                messagebox.showerror(
+                    "错误", f"无法连接到{source_type}:\n{self.rtsp_url}"
+                )
                 self.video_capture = None
                 return
 
@@ -405,7 +455,8 @@ class MainWindow:
             # 开始更新视频帧
             self._update_video_frame()
 
-            print("视频流已启动")
+            source_type = "本地摄像头" if self.rtsp_url == "0" else "RTSP流"
+            print(f"{source_type}已启动")
 
         except Exception as e:
             messagebox.showerror("错误", f"启动视频流失败:\n{str(e)}")
@@ -449,34 +500,67 @@ class MainWindow:
             print(f"停止视频流错误: {e}")
 
     def _update_video_frame(self) -> None:
-        """更新视频帧"""
+        """
+        更新视频帧 - 按照流程图实现
+
+        流程：
+        ┌──────────────────┐
+        │ 1. 读取视频帧      │ ← ret, frame = video_capture.read()
+        └────────┬─────────┘
+                 │
+                 ▼
+        ┌────────────────────┐
+        │ 2. BGR → RGB 转换   │ ← cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        └────────┬─────────────┘
+                 │
+                 ▼
+        ┌──────────────────────────┐
+        │ 3. 调整大小（保持宽高比） │ ← _resize_frame()
+        └────────┬─────────────────┘
+                 │
+                 ▼
+        ┌────────────────────────────────┐
+        │ 4. 转换为 PIL.Image → ImageTk │ ← Image.fromarray() → ImageTk.PhotoImage()
+        └────────┬───────────────────────┘
+                 │
+                 ▼
+        ┌────────────────────────┐
+        │ 5. Canvas 显示图像      │ ← canvas.create_image()
+        └────────────────────────┘
+        """
         if not self.is_playing or self.video_capture is None:
             return
 
         try:
             # 如果暂停，则不读取新帧，但继续调度
             if not self.is_paused:
+                # ========== 步骤1: 读取视频帧 ==========
                 ret, frame = self.video_capture.read()
 
                 if ret:
-                    # 转换颜色空间 (BGR -> RGB)
+                    # ========== 步骤2: BGR → RGB 转换 ==========
+                    # OpenCV默认使用BGR格式，需要转换为RGB供PIL使用
                     frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
                     # 获取画布尺寸
                     canvas_width = self.video_canvas.winfo_width()
                     canvas_height = self.video_canvas.winfo_height()
 
-                    # 调整帧大小以适应画布
+                    # ========== 步骤3: 调整帧大小以适应画布 ==========
                     frame_resized = self._resize_frame(
                         frame_rgb, canvas_width, canvas_height
                     )
 
-                    # 转换为PIL图像
+                    # ========== 步骤4: 转换为PIL图像 → ImageTk ==========
+                    # PIL.Image.fromarray() 将numpy数组转换为PIL图像
                     image = Image.fromarray(frame_resized)
+                    # ImageTk.PhotoImage() 转换为Tkinter可用的图像格式
                     photo = ImageTk.PhotoImage(image=image)
 
-                    # 更新画布
+                    # ========== 步骤5: Tkinter Canvas 显示图像 ==========
+                    # 清空画布
                     self.video_canvas.delete("all")
+                    # 在画布中心显示图像
                     self.video_canvas.create_image(
                         canvas_width // 2,
                         canvas_height // 2,
@@ -484,7 +568,7 @@ class MainWindow:
                         anchor=tk.CENTER,
                     )
 
-                    # 保持引用，防止被垃圾回收
+                    # 保持引用，防止被Python垃圾回收
                     self.video_canvas.image = photo
 
                 else:
@@ -494,7 +578,7 @@ class MainWindow:
                     messagebox.showwarning("警告", "视频流连接中断")
                     return
 
-            # 继续调度下一帧更新（约30fps）
+            # 继续调度下一帧更新（约30fps，33ms一帧）
             self.update_id = self.root.after(33, self._update_video_frame)
 
         except Exception as e:
