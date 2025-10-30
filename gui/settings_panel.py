@@ -18,19 +18,47 @@ from typing import Dict, Optional, Union
 class SettingsPanel:
     """设置面板类 - 左侧导航右侧内容的双栏布局"""
 
-    def __init__(self, parent: Union[tk.Tk, tk.Toplevel]) -> None:
+    def __init__(
+        self, parent: Union[tk.Tk, tk.Toplevel], app_config: Dict = None
+    ) -> None:
         """
         初始化设置面板
 
         Args:
             parent: 父窗口
+            app_config: 应用程序配置字典（从主窗口传入，用于持久化配置）
         """
         self.parent = parent
         self.current_page: Optional[str] = None
         self.content_frames: Dict[str, ttk.Frame] = {}
 
-        # 场景类型列表（可动态添加）
-        self.scene_types: list[str] = ["摔倒", "起火"]
+        # 使用传入的配置或创建新配置（用于测试）
+        if app_config is None:
+            # 测试模式：创建默认配置
+            self.app_config = {
+                "rtsp": {
+                    "url": "rtsp://",
+                    "username": "",
+                    "password": "",
+                    "port": "554",
+                    "timeout": "10",
+                },
+                "scene": {
+                    "scene_type": "摔倒",
+                    "light_condition": "normal",
+                    "enable_roi": False,
+                    "enable_sound": True,
+                    "enable_email": False,
+                    "auto_record": False,
+                },
+                "scene_types": ["摔倒", "起火"],
+            }
+        else:
+            # 生产模式：使用主窗口传入的配置
+            self.app_config = app_config
+
+        # 场景类型列表（引用配置中的数据）
+        self.scene_types: list[str] = self.app_config["scene_types"]
 
         # 设置窗口长宽比 (3:2)
         self.aspect_ratio = 3 / 2
@@ -159,7 +187,7 @@ class SettingsPanel:
         url_frame.pack(fill=tk.X, pady=(0, 15))
 
         ttk.Label(url_frame, text="RTSP URL:", width=15).pack(side=tk.LEFT)
-        self.rtsp_url_var = tk.StringVar(value="rtsp://")
+        self.rtsp_url_var = tk.StringVar(value=self.app_config["rtsp"]["url"])
         rtsp_entry = ttk.Entry(url_frame, textvariable=self.rtsp_url_var, width=50)
         rtsp_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(5, 0))
 
@@ -168,7 +196,7 @@ class SettingsPanel:
         user_frame.pack(fill=tk.X, pady=(0, 15))
 
         ttk.Label(user_frame, text="用户名:", width=15).pack(side=tk.LEFT)
-        self.rtsp_user_var = tk.StringVar()
+        self.rtsp_user_var = tk.StringVar(value=self.app_config["rtsp"]["username"])
         user_entry = ttk.Entry(user_frame, textvariable=self.rtsp_user_var, width=30)
         user_entry.pack(side=tk.LEFT, padx=(5, 0))
 
@@ -177,7 +205,7 @@ class SettingsPanel:
         pass_frame.pack(fill=tk.X, pady=(0, 15))
 
         ttk.Label(pass_frame, text="密码:", width=15).pack(side=tk.LEFT)
-        self.rtsp_pass_var = tk.StringVar()
+        self.rtsp_pass_var = tk.StringVar(value=self.app_config["rtsp"]["password"])
         pass_entry = ttk.Entry(
             pass_frame, textvariable=self.rtsp_pass_var, show="*", width=30
         )
@@ -188,7 +216,7 @@ class SettingsPanel:
         port_frame.pack(fill=tk.X, pady=(0, 15))
 
         ttk.Label(port_frame, text="端口号:", width=15).pack(side=tk.LEFT)
-        self.rtsp_port_var = tk.StringVar(value="554")
+        self.rtsp_port_var = tk.StringVar(value=self.app_config["rtsp"]["port"])
         port_entry = ttk.Entry(port_frame, textvariable=self.rtsp_port_var, width=10)
         port_entry.pack(side=tk.LEFT, padx=(5, 0))
 
@@ -197,7 +225,7 @@ class SettingsPanel:
         timeout_frame.pack(fill=tk.X, pady=(0, 20))
 
         ttk.Label(timeout_frame, text="连接超时(秒):", width=15).pack(side=tk.LEFT)
-        self.rtsp_timeout_var = tk.IntVar(value=10)
+        self.rtsp_timeout_var = tk.IntVar(value=int(self.app_config["rtsp"]["timeout"]))
         timeout_spinbox = ttk.Spinbox(
             timeout_frame,
             from_=5,
@@ -239,7 +267,7 @@ class SettingsPanel:
         scene_select_frame.pack(fill=tk.X, pady=(0, 15))
 
         ttk.Label(scene_select_frame, text="场景类型:", width=15).pack(side=tk.LEFT)
-        self.scene_type_var = tk.StringVar(value=self.scene_types[0])
+        self.scene_type_var = tk.StringVar(value=self.app_config["scene"]["scene_type"])
         self.scene_combo = ttk.Combobox(
             scene_select_frame,
             textvariable=self.scene_type_var,
@@ -275,7 +303,9 @@ class SettingsPanel:
         light_frame.pack(fill=tk.X, pady=(0, 10))
 
         ttk.Label(light_frame, text="光照条件:", width=15).pack(side=tk.LEFT)
-        self.light_condition_var = tk.StringVar(value="normal")
+        self.light_condition_var = tk.StringVar(
+            value=self.app_config["scene"]["light_condition"]
+        )
         ttk.Radiobutton(
             light_frame, text="明亮", variable=self.light_condition_var, value="bright"
         ).pack(side=tk.LEFT, padx=5)
@@ -291,7 +321,9 @@ class SettingsPanel:
         area_frame.pack(fill=tk.X, pady=(0, 10))
 
         ttk.Label(area_frame, text="检测区域:", width=15).pack(side=tk.LEFT)
-        self.enable_roi_var = tk.BooleanVar(value=False)
+        self.enable_roi_var = tk.BooleanVar(
+            value=self.app_config["scene"]["enable_roi"]
+        )
         ttk.Checkbutton(
             area_frame,
             text="启用感兴趣区域(ROI)",
@@ -304,12 +336,16 @@ class SettingsPanel:
         alarm_frame.pack(fill=tk.X, pady=(0, 10))
 
         ttk.Label(alarm_frame, text="报警设置:", width=15).pack(side=tk.LEFT)
-        self.enable_sound_var = tk.BooleanVar(value=True)
+        self.enable_sound_var = tk.BooleanVar(
+            value=self.app_config["scene"]["enable_sound"]
+        )
         ttk.Checkbutton(
             alarm_frame, text="声音报警", variable=self.enable_sound_var
         ).pack(side=tk.LEFT, padx=5)
 
-        self.enable_email_var = tk.BooleanVar(value=False)
+        self.enable_email_var = tk.BooleanVar(
+            value=self.app_config["scene"]["enable_email"]
+        )
         ttk.Checkbutton(
             alarm_frame, text="邮件通知", variable=self.enable_email_var
         ).pack(side=tk.LEFT, padx=5)
@@ -319,7 +355,9 @@ class SettingsPanel:
         record_frame.pack(fill=tk.X, pady=(0, 10))
 
         ttk.Label(record_frame, text="录像设置:", width=15).pack(side=tk.LEFT)
-        self.auto_record_var = tk.BooleanVar(value=True)
+        self.auto_record_var = tk.BooleanVar(
+            value=self.app_config["scene"]["auto_record"]
+        )
         ttk.Checkbutton(
             record_frame, text="事件触发时自动录像", variable=self.auto_record_var
         ).pack(side=tk.LEFT, padx=(5, 0))
@@ -371,16 +409,15 @@ class SettingsPanel:
 
     def _save_rtsp_config(self) -> None:
         """保存RTSP配置"""
-        config = {
-            "url": self.rtsp_url_var.get(),
-            "username": self.rtsp_user_var.get(),
-            "password": self.rtsp_pass_var.get(),
-            "port": self.rtsp_port_var.get(),
-            "timeout": self.rtsp_timeout_var.get(),
-        }
+        # 更新共享配置
+        self.app_config["rtsp"]["url"] = self.rtsp_url_var.get()
+        self.app_config["rtsp"]["username"] = self.rtsp_user_var.get()
+        self.app_config["rtsp"]["password"] = self.rtsp_pass_var.get()
+        self.app_config["rtsp"]["port"] = self.rtsp_port_var.get()
+        self.app_config["rtsp"]["timeout"] = str(self.rtsp_timeout_var.get())
+
         messagebox.showinfo("保存成功", "RTSP配置已保存")
-        print(f"RTSP配置: {config}")
-        # TODO: 实现配置保存到文件
+        print(f"RTSP配置已保存到app_config: {self.app_config['rtsp']}")
 
     def _on_scene_change(self, event=None) -> None:
         """场景类型改变时的回调"""
@@ -395,9 +432,9 @@ class SettingsPanel:
         dialog.title("新建场景")
         dialog.resizable(False, False)
 
-        # 设置窗口大小并居中显示
-        dialog_width = 480
-        dialog_height = 280
+        # 设置窗口大小为父窗口的50%并居中显示
+        dialog_width = int(self.parent.winfo_width() * 0.5)
+        dialog_height = int(self.parent.winfo_height() * 0.5)
         self._center_window(dialog, dialog_width, dialog_height)
 
         # 设置为模态窗口
@@ -527,17 +564,16 @@ class SettingsPanel:
 
     def _save_scene_config(self) -> None:
         """保存场景配置"""
-        config = {
-            "scene_type": self.scene_type_var.get(),
-            "light_condition": self.light_condition_var.get(),
-            "enable_roi": self.enable_roi_var.get(),
-            "enable_sound": self.enable_sound_var.get(),
-            "enable_email": self.enable_email_var.get(),
-            "auto_record": self.auto_record_var.get(),
-        }
+        # 更新共享配置
+        self.app_config["scene"]["scene_type"] = self.scene_type_var.get()
+        self.app_config["scene"]["light_condition"] = self.light_condition_var.get()
+        self.app_config["scene"]["enable_roi"] = self.enable_roi_var.get()
+        self.app_config["scene"]["enable_sound"] = self.enable_sound_var.get()
+        self.app_config["scene"]["enable_email"] = self.enable_email_var.get()
+        self.app_config["scene"]["auto_record"] = self.auto_record_var.get()
+
         messagebox.showinfo("保存成功", "场景配置已保存")
-        print(f"场景配置: {config}")
-        # TODO: 实现配置保存到文件
+        print(f"场景配置已保存到app_config: {self.app_config['scene']}")
 
     def _on_window_resize(self, event: tk.Event) -> None:
         """窗口缩放事件处理器，保持窗口宽高比 (3:2)"""

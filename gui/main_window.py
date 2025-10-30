@@ -58,6 +58,30 @@ class MainWindow:
 
         # 设置窗口引用
         self.settings_window: Optional[tk.Toplevel] = None
+        self.settings_panel: Optional[SettingsPanel] = None
+
+        # 持久化配置数据（在关闭主窗口前一直保留）
+        self.app_config = {
+            # RTSP配置
+            "rtsp": {
+                "url": "rtsp://",
+                "username": "",
+                "password": "",
+                "port": "554",
+                "timeout": "10",
+            },
+            # 场景配置
+            "scene": {
+                "scene_type": "摔倒",
+                "light_condition": "normal",
+                "enable_roi": False,
+                "enable_sound": True,
+                "enable_email": False,
+                "auto_record": False,
+            },
+            # 场景类型列表
+            "scene_types": ["摔倒", "起火"],
+        }
 
         # 视频流相关变量
         self.video_capture: Optional[cv2.VideoCapture] = None
@@ -313,9 +337,9 @@ class MainWindow:
         choice_dialog.title("选择视频源")
         choice_dialog.resizable(False, False)
 
-        # 设置窗口大小并居中显示
-        dialog_width = 500
-        dialog_height = 250
+        # 设置窗口大小为主窗口的50%并居中显示
+        dialog_width = int(self.root.winfo_width() * 0.5)
+        dialog_height = int(self.root.winfo_height() * 0.5)
         self._center_window(choice_dialog, dialog_width, dialog_height)
 
         # 设置为模态窗口
@@ -323,16 +347,16 @@ class MainWindow:
         choice_dialog.grab_set()
 
         # 创建选择框架
-        frame = ttk.Frame(choice_dialog, padding="30")
+        frame = ttk.Frame(choice_dialog, padding="20")
         frame.pack(fill=tk.BOTH, expand=True)
 
-        ttk.Label(frame, text="请选择视频源类型:", font=("Arial", 14, "bold")).pack(
-            pady=(10, 30)
+        ttk.Label(frame, text="请选择视频源类型:", font=("Arial", 12, "bold")).pack(
+            pady=(5, 20)
         )
 
         # 按钮容器
         button_frame = ttk.Frame(frame)
-        button_frame.pack(expand=True, pady=(0, 20))
+        button_frame.pack(expand=True, pady=(0, 10))
 
         def on_camera():
             choice_dialog.destroy()
@@ -355,12 +379,12 @@ class MainWindow:
                 messagebox.showwarning("警告", "未设置RTSP地址")
 
         ttk.Button(
-            button_frame, text="📷 本地摄像头", command=on_camera, width=22, padding=10
-        ).pack(side=tk.LEFT, padx=15)
+            button_frame, text="📷 本地摄像头", command=on_camera, width=18, padding=8
+        ).pack(side=tk.LEFT, padx=10)
 
         ttk.Button(
-            button_frame, text="📡 RTSP网络流", command=on_rtsp, width=22, padding=10
-        ).pack(side=tk.LEFT, padx=15)
+            button_frame, text="📡 RTSP网络流", command=on_rtsp, width=18, padding=8
+        ).pack(side=tk.LEFT, padx=10)
 
     def _on_pause(self) -> None:
         """暂停按钮回调"""
@@ -398,7 +422,7 @@ class MainWindow:
         self.settings_window = tk.Toplevel(self.root)
         self.settings_window.title("DLC检测系统 - 设置")
 
-        # 设置窗口尺寸
+        # 设置窗口尺寸（固定大小）
         settings_width = 1000
         settings_height = 666
 
@@ -421,13 +445,14 @@ class MainWindow:
         except Exception as e:
             print(f"无法加载设置窗口图标: {e}")
 
-        # 创建设置面板
-        settings_panel = SettingsPanel(self.settings_window)
+        # 创建设置面板，传递配置数据
+        self.settings_panel = SettingsPanel(self.settings_window, self.app_config)
 
-        # 窗口关闭时清理引用
+        # 窗口关闭时清理引用（但不清理配置数据）
         def on_settings_close():
             self.settings_window.destroy()
             self.settings_window = None
+            self.settings_panel = None
 
         self.settings_window.protocol("WM_DELETE_WINDOW", on_settings_close)
 
