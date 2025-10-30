@@ -17,6 +17,7 @@ from tkinter import ttk
 from typing import Dict, Optional
 from PIL import Image, ImageTk
 import cv2
+from settings_panel import SettingsPanel
 
 
 class MainWindow:
@@ -26,36 +27,44 @@ class MainWindow:
     VIDEO_RATIO = 16 / 9  # 视频显示比例
     SCREEN_RATIO = 0.7  # 窗口占屏幕比例
 
-    def __init__(self) -> None:
+    def __init__(self) -> None:  # 没有返回值
         """初始化主窗口"""
+        # 面向对象：带self的都是实例变量，不是针对类的而言的
         # 创建主窗口
         self.root = tk.Tk()
-        self.root.title("主窗口 - 实时视频预览与检测")
+        self.root.title("主窗口 - 实时视频")
 
         # 获取屏幕尺寸
         self.screen_width = self.root.winfo_screenwidth()
         self.screen_height = self.root.winfo_screenheight()
 
         # 计算窗口尺寸
-        self.target_width = int(self.screen_width * self.SCREEN_RATIO)
-        self.target_height = int(self.screen_height * self.SCREEN_RATIO)
-        self.aspect_ratio = self.target_width / self.target_height
+        self.target_width = int(
+            self.screen_width * self.SCREEN_RATIO
+        )  # 长乘比例缩放系数
+        self.target_height = int(
+            self.screen_height * self.SCREEN_RATIO
+        )  # 宽乘比例缩放系数
+        self.aspect_ratio = self.target_width / self.target_height  # 屏幕长宽比
 
-        # 缩放状态跟踪
-        self._resize_state: Dict[str, any] = {
+        # 缩放状态跟踪（创建了一个字典跟踪调整时的状态）
+        self._resize_state: Dict[str, any] = {  # 键一定是字符串，值可以任意
             "width": self.target_width,
             "height": self.target_height,
             "lock": False,
             "initialized": False,
         }
 
-        # 初始化GUI组件
+        # 设置窗口引用
+        self.settings_window: Optional[tk.Toplevel] = None
+
+        # 初始化GUI组件，在init时自动调用
         self._setup_window()
         self._setup_icon()
         self._create_widgets()
         self._bind_events()
 
-        # 确保初始几何形状
+        # 确保初始几何形状（after_idle是时序控制，所有待处理事件都执行完毕后才会调用_ensure_initial_geometry)
         self.root.after_idle(self._ensure_initial_geometry)
 
     def _setup_window(self) -> None:
@@ -65,13 +74,13 @@ class MainWindow:
         center_y = int((self.screen_height - self.target_height) / 2)
 
         # 设置窗口大小和位置
-        geometry = f"{self.target_width}x{self.target_height}+{center_x}+{center_y}"
+        geometry = f"{self.target_width}x{self.target_height}+{center_x}+{center_y}"  # 告诉tk长、宽、偏移量
         self.root.geometry(geometry)
 
         # 允许缩放并设置最小尺寸
         self.root.resizable(True, True)
-        min_height = int(320 / self.aspect_ratio)
-        self.root.minsize(320, min_height)
+        min_height = int(800 / self.aspect_ratio)
+        self.root.minsize(800, min_height)
 
         # 配置网格布局
         self.root.grid_rowconfigure(0, weight=1)
@@ -276,8 +285,48 @@ class MainWindow:
 
     def _on_settings(self) -> None:
         """设置按钮回调"""
-        print("打开设置...")
-        # TODO: 实现设置界面
+        # 如果设置窗口已经打开，则聚焦到该窗口
+        if self.settings_window is not None and self.settings_window.winfo_exists():
+            self.settings_window.lift()
+            self.settings_window.focus_force()
+            return
+
+        # 创建新的设置窗口
+        self.settings_window = tk.Toplevel(self.root)
+        self.settings_window.title("DLC检测系统 - 设置")
+
+        # 设置窗口尺寸
+        settings_width = 1000
+        settings_height = 666
+
+        # 计算屏幕中央位置
+        screen_width = self.settings_window.winfo_screenwidth()
+        screen_height = self.settings_window.winfo_screenheight()
+        center_x = int((screen_width - settings_width) / 2)
+        center_y = int((screen_height - settings_height) / 2)
+
+        # 设置窗口大小和位置（居中显示）
+        self.settings_window.geometry(
+            f"{settings_width}x{settings_height}+{center_x}+{center_y}"
+        )
+
+        # 设置窗口图标（如果有的话）
+        try:
+            icon = Image.open("gui/kawaii_icon.png")
+            photo = ImageTk.PhotoImage(icon)
+            self.settings_window.wm_iconphoto(True, photo)
+        except Exception as e:
+            print(f"无法加载设置窗口图标: {e}")
+
+        # 创建设置面板
+        settings_panel = SettingsPanel(self.settings_window)
+
+        # 窗口关闭时清理引用
+        def on_settings_close():
+            self.settings_window.destroy()
+            self.settings_window = None
+
+        self.settings_window.protocol("WM_DELETE_WINDOW", on_settings_close)
 
     def _on_window_close(self) -> None:
         """窗口关闭事件处理器"""
