@@ -415,5 +415,6 @@ python main.py --source video --path assets/test_videos/fall_detection/test1.mp4
   - CLIP实践教程: https://huggingface.co/docs/transformers/model_doc/clip
   - OpenCV视频处理: https://docs.opencv.org/4.x/dd/d43/tutorial_py_video_display.html
 
+***
 
 
