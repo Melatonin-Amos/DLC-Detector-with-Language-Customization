@@ -36,13 +36,6 @@ class SettingsPanel:
         if app_config is None:
             # 测试模式：创建默认配置
             self.app_config = {
-                "rtsp": {
-                    "url": "rtsp://",
-                    "username": "",
-                    "password": "",
-                    "port": "554",
-                    "timeout": "10",
-                },
                 "scene": {
                     "scene_type": "摔倒",
                     "light_condition": "normal",
@@ -83,8 +76,8 @@ class SettingsPanel:
         # 创建各个设置页面
         self._create_pages()
 
-        # 默认显示第一个页面
-        self.show_page("rtsp")
+        # 默认显示场景页面
+        self.show_page("scene")
 
         # 绑定窗口缩放事件
         self.parent.bind("<Configure>", self._on_window_resize)
@@ -102,21 +95,11 @@ class SettingsPanel:
     def _create_navigation(self) -> None:
         """创建左侧导航栏"""
         # 导航栏框架
-        nav_frame = ttk.LabelFrame(self.main_container, text="设置选项", padding="10")
+        nav_frame = ttk.LabelFrame(self.main_container, text="设置选项", padding="15")
         nav_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
 
         # 导航按钮样式配置
-        button_style = {"width": 20, "padding": 10}
-
-        # 1. RTSP流配置按钮
-        self.btn_rtsp = ttk.Button(
-            nav_frame,
-            text="📡 RTSP流配置",
-            command=lambda: self.show_page("rtsp"),
-            **button_style,
-        )
-        self.btn_rtsp.pack(fill=tk.X, pady=(0, 10))
-
+        button_style = {"width": 20, "padding": 12}
         # 2. 场景配置按钮
         self.btn_scene = ttk.Button(
             nav_frame,
@@ -124,11 +107,9 @@ class SettingsPanel:
             command=lambda: self.show_page("scene"),
             **button_style,
         )
-        self.btn_scene.pack(fill=tk.X, pady=(0, 10))
-
+        self.btn_scene.pack(fill=tk.X, pady=(0, 15))
         # 保存按钮列表以便高亮显示
         self.nav_buttons = {
-            "rtsp": self.btn_rtsp,
             "scene": self.btn_scene,
         }
 
@@ -161,121 +142,39 @@ class SettingsPanel:
 
     def _create_pages(self) -> None:
         """创建所有设置页面"""
-        # 创建RTSP流配置页面
-        self.content_frames["rtsp"] = self._create_rtsp_page()
-
         # 创建场景配置页面
         self.content_frames["scene"] = self._create_scene_page()
 
-    def _create_rtsp_page(self) -> ttk.Frame:
-        """创建RTSP流配置页面"""
-        frame = ttk.LabelFrame(
-            self.content_container, text="📡 RTSP流配置", padding="20"
-        )
-
-        # 说明文字
-        desc_label = ttk.Label(
-            frame,
-            text="配置视频流的RTSP连接参数",
-            font=("Arial", 10, "italic"),
-            foreground="gray",
-        )
-        desc_label.pack(anchor="w", pady=(0, 20))
-
-        # RTSP URL输入
-        url_frame = ttk.Frame(frame)
-        url_frame.pack(fill=tk.X, pady=(0, 15))
-
-        ttk.Label(url_frame, text="RTSP URL:", width=15).pack(side=tk.LEFT)
-        self.rtsp_url_var = tk.StringVar(value=self.app_config["rtsp"]["url"])
-        rtsp_entry = ttk.Entry(url_frame, textvariable=self.rtsp_url_var, width=50)
-        rtsp_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(5, 0))
-
-        # 用户名输入
-        user_frame = ttk.Frame(frame)
-        user_frame.pack(fill=tk.X, pady=(0, 15))
-
-        ttk.Label(user_frame, text="用户名:", width=15).pack(side=tk.LEFT)
-        self.rtsp_user_var = tk.StringVar(value=self.app_config["rtsp"]["username"])
-        user_entry = ttk.Entry(user_frame, textvariable=self.rtsp_user_var, width=30)
-        user_entry.pack(side=tk.LEFT, padx=(5, 0))
-
-        # 密码输入
-        pass_frame = ttk.Frame(frame)
-        pass_frame.pack(fill=tk.X, pady=(0, 15))
-
-        ttk.Label(pass_frame, text="密码:", width=15).pack(side=tk.LEFT)
-        self.rtsp_pass_var = tk.StringVar(value=self.app_config["rtsp"]["password"])
-        pass_entry = ttk.Entry(
-            pass_frame, textvariable=self.rtsp_pass_var, show="*", width=30
-        )
-        pass_entry.pack(side=tk.LEFT, padx=(5, 0))
-
-        # 端口号输入
-        port_frame = ttk.Frame(frame)
-        port_frame.pack(fill=tk.X, pady=(0, 15))
-
-        ttk.Label(port_frame, text="端口号:", width=15).pack(side=tk.LEFT)
-        self.rtsp_port_var = tk.StringVar(value=self.app_config["rtsp"]["port"])
-        port_entry = ttk.Entry(port_frame, textvariable=self.rtsp_port_var, width=10)
-        port_entry.pack(side=tk.LEFT, padx=(5, 0))
-
-        # 超时设置
-        timeout_frame = ttk.Frame(frame)
-        timeout_frame.pack(fill=tk.X, pady=(0, 20))
-
-        ttk.Label(timeout_frame, text="连接超时(秒):", width=15).pack(side=tk.LEFT)
-        self.rtsp_timeout_var = tk.IntVar(value=int(self.app_config["rtsp"]["timeout"]))
-        timeout_spinbox = ttk.Spinbox(
-            timeout_frame,
-            from_=5,
-            to=60,
-            textvariable=self.rtsp_timeout_var,
-            width=10,
-        )
-        timeout_spinbox.pack(side=tk.LEFT, padx=(5, 0))
-
-        # 按钮区域
-        button_frame = ttk.Frame(frame)
-        button_frame.pack(fill=tk.X, pady=(10, 0))
-
-        ttk.Button(
-            button_frame, text="测试连接", command=self._test_rtsp_connection
-        ).pack(side=tk.LEFT, padx=(0, 10))
-
-        ttk.Button(button_frame, text="保存配置", command=self._save_rtsp_config).pack(
-            side=tk.LEFT
-        )
-
-        return frame
-
     def _create_scene_page(self) -> ttk.Frame:
         """创建场景配置页面"""
-        frame = ttk.LabelFrame(self.content_container, text="🎬 场景配置", padding="20")
+        frame = ttk.LabelFrame(self.content_container, text="🎬 场景配置", padding="25")
 
         # 说明文字
         desc_label = ttk.Label(
             frame,
             text="配置不同检测场景的参数",
-            font=("Arial", 10, "italic"),
+            font=("Arial", 12, "italic"),
             foreground="gray",
         )
-        desc_label.pack(anchor="w", pady=(0, 20))
+        desc_label.pack(anchor="w", pady=(0, 25))
 
         # 场景选择和新建
         scene_select_frame = ttk.Frame(frame)
-        scene_select_frame.pack(fill=tk.X, pady=(0, 15))
+        scene_select_frame.pack(fill=tk.X, pady=(0, 20))
 
-        ttk.Label(scene_select_frame, text="场景类型:", width=15).pack(side=tk.LEFT)
+        ttk.Label(
+            scene_select_frame, text="场景类型:", width=12, font=("Arial", 11)
+        ).pack(side=tk.LEFT)
         self.scene_type_var = tk.StringVar(value=self.app_config["scene"]["scene_type"])
         self.scene_combo = ttk.Combobox(
             scene_select_frame,
             textvariable=self.scene_type_var,
             values=self.scene_types,
             state="readonly",
-            width=20,
+            width=18,
+            font=("Arial", 11),
         )
-        self.scene_combo.pack(side=tk.LEFT, padx=(5, 10))
+        self.scene_combo.pack(side=tk.LEFT, padx=(8, 12))
         self.scene_combo.bind("<<ComboboxSelected>>", self._on_scene_change)
 
         # 新建场景按钮
@@ -283,44 +182,50 @@ class SettingsPanel:
             scene_select_frame,
             text="➕ 新建场景",
             command=self._create_new_scene,
-            width=12,
-        ).pack(side=tk.LEFT, padx=(0, 10))
+            width=13,
+            padding=5,
+        ).pack(side=tk.LEFT, padx=(0, 12))
 
         # 删除场景按钮
         ttk.Button(
             scene_select_frame,
             text="删除场景",
             command=self._delete_current_scene,
-            width=12,
+            width=13,
+            padding=5,
         ).pack(side=tk.LEFT)
 
         # 场景参数区域
-        params_frame = ttk.LabelFrame(frame, text="场景参数", padding="15")
-        params_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 20))
+        params_frame = ttk.LabelFrame(frame, text="场景参数", padding="18")
+        params_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 25))
 
         # 光照条件
         light_frame = ttk.Frame(params_frame)
-        light_frame.pack(fill=tk.X, pady=(0, 10))
+        light_frame.pack(fill=tk.X, pady=(0, 15))
 
-        ttk.Label(light_frame, text="光照条件:", width=15).pack(side=tk.LEFT)
+        ttk.Label(light_frame, text="光照条件:", width=12, font=("Arial", 11)).pack(
+            side=tk.LEFT
+        )
         self.light_condition_var = tk.StringVar(
             value=self.app_config["scene"]["light_condition"]
         )
         ttk.Radiobutton(
             light_frame, text="明亮", variable=self.light_condition_var, value="bright"
-        ).pack(side=tk.LEFT, padx=5)
+        ).pack(side=tk.LEFT, padx=8)
         ttk.Radiobutton(
             light_frame, text="正常", variable=self.light_condition_var, value="normal"
-        ).pack(side=tk.LEFT, padx=5)
+        ).pack(side=tk.LEFT, padx=8)
         ttk.Radiobutton(
             light_frame, text="昏暗", variable=self.light_condition_var, value="dim"
-        ).pack(side=tk.LEFT, padx=5)
+        ).pack(side=tk.LEFT, padx=8)
 
         # 检测区域
         area_frame = ttk.Frame(params_frame)
-        area_frame.pack(fill=tk.X, pady=(0, 10))
+        area_frame.pack(fill=tk.X, pady=(0, 15))
 
-        ttk.Label(area_frame, text="检测区域:", width=15).pack(side=tk.LEFT)
+        ttk.Label(area_frame, text="检测区域:", width=12, font=("Arial", 11)).pack(
+            side=tk.LEFT
+        )
         self.enable_roi_var = tk.BooleanVar(
             value=self.app_config["scene"]["enable_roi"]
         )
@@ -329,49 +234,56 @@ class SettingsPanel:
             text="启用感兴趣区域(ROI)",
             variable=self.enable_roi_var,
             command=self._toggle_roi,
-        ).pack(side=tk.LEFT, padx=(5, 0))
+        ).pack(side=tk.LEFT, padx=(8, 0))
 
         # 报警设置
         alarm_frame = ttk.Frame(params_frame)
-        alarm_frame.pack(fill=tk.X, pady=(0, 10))
+        alarm_frame.pack(fill=tk.X, pady=(0, 15))
 
-        ttk.Label(alarm_frame, text="报警设置:", width=15).pack(side=tk.LEFT)
+        ttk.Label(alarm_frame, text="报警设置:", width=12, font=("Arial", 11)).pack(
+            side=tk.LEFT
+        )
         self.enable_sound_var = tk.BooleanVar(
             value=self.app_config["scene"]["enable_sound"]
         )
         ttk.Checkbutton(
             alarm_frame, text="声音报警", variable=self.enable_sound_var
-        ).pack(side=tk.LEFT, padx=5)
+        ).pack(side=tk.LEFT, padx=8)
 
         self.enable_email_var = tk.BooleanVar(
             value=self.app_config["scene"]["enable_email"]
         )
         ttk.Checkbutton(
             alarm_frame, text="邮件通知", variable=self.enable_email_var
-        ).pack(side=tk.LEFT, padx=5)
+        ).pack(side=tk.LEFT, padx=8)
 
         # 录像设置
         record_frame = ttk.Frame(params_frame)
-        record_frame.pack(fill=tk.X, pady=(0, 10))
+        record_frame.pack(fill=tk.X, pady=(0, 15))
 
-        ttk.Label(record_frame, text="录像设置:", width=15).pack(side=tk.LEFT)
+        ttk.Label(record_frame, text="录像设置:", width=12, font=("Arial", 11)).pack(
+            side=tk.LEFT
+        )
         self.auto_record_var = tk.BooleanVar(
             value=self.app_config["scene"]["auto_record"]
         )
         ttk.Checkbutton(
             record_frame, text="事件触发时自动录像", variable=self.auto_record_var
-        ).pack(side=tk.LEFT, padx=(5, 0))
+        ).pack(side=tk.LEFT, padx=(8, 0))
 
         # 按钮区域
         button_frame = ttk.Frame(frame)
-        button_frame.pack(fill=tk.X, pady=(10, 0))
-
-        ttk.Button(button_frame, text="设置ROI区域", command=self._set_roi_area).pack(
-            side=tk.LEFT, padx=(0, 10)
-        )
+        button_frame.pack(fill=tk.X, pady=(15, 0))
 
         ttk.Button(
-            button_frame, text="保存场景配置", command=self._save_scene_config
+            button_frame, text="设置ROI区域", command=self._set_roi_area, padding=6
+        ).pack(side=tk.LEFT, padx=(0, 12))
+
+        ttk.Button(
+            button_frame,
+            text="保存场景配置",
+            command=self._save_scene_config,
+            padding=6,
         ).pack(side=tk.LEFT)
 
         return frame
@@ -397,28 +309,6 @@ class SettingsPanel:
 
     # ========== 回调函数 ==========
 
-    def _test_rtsp_connection(self) -> None:
-        """测试RTSP连接"""
-        url = self.rtsp_url_var.get()
-        if not url or url == "rtsp://":
-            messagebox.showwarning("警告", "请输入有效的RTSP URL")
-            return
-
-        messagebox.showinfo("测试连接", f"正在测试连接: {url}\n(此功能待实现)")
-        # TODO: 实现实际的RTSP连接测试
-
-    def _save_rtsp_config(self) -> None:
-        """保存RTSP配置"""
-        # 更新共享配置
-        self.app_config["rtsp"]["url"] = self.rtsp_url_var.get()
-        self.app_config["rtsp"]["username"] = self.rtsp_user_var.get()
-        self.app_config["rtsp"]["password"] = self.rtsp_pass_var.get()
-        self.app_config["rtsp"]["port"] = self.rtsp_port_var.get()
-        self.app_config["rtsp"]["timeout"] = str(self.rtsp_timeout_var.get())
-
-        messagebox.showinfo("保存成功", "RTSP配置已保存")
-        print(f"RTSP配置已保存到app_config: {self.app_config['rtsp']}")
-
     def _on_scene_change(self, event=None) -> None:
         """场景类型改变时的回调"""
         scene = self.scene_type_var.get()
@@ -442,29 +332,29 @@ class SettingsPanel:
         dialog.grab_set()
 
         # 创建输入框架
-        input_frame = ttk.Frame(dialog, padding="30")
+        input_frame = ttk.Frame(dialog, padding="35")
         input_frame.pack(fill=tk.BOTH, expand=True)
 
         # 说明标签
         ttk.Label(
-            input_frame, text="请输入新场景的名称：", font=("Arial", 12, "bold")
-        ).pack(pady=(10, 20))
+            input_frame, text="请输入新场景的名称：", font=("Arial", 13, "bold")
+        ).pack(pady=(10, 25))
 
         # 场景名称输入框
         scene_name_var = tk.StringVar()
         name_entry = ttk.Entry(
             input_frame, textvariable=scene_name_var, font=("Arial", 12), width=30
         )
-        name_entry.pack(pady=(0, 20))
+        name_entry.pack(pady=(0, 25))
         name_entry.focus()
 
         # 提示文字
         ttk.Label(
             input_frame,
             text="例如：跌倒、起火、闯入等",
-            font=("Arial", 9),
+            font=("Arial", 10),
             foreground="gray",
-        ).pack(pady=(0, 30))
+        ).pack(pady=(0, 35))
 
         def on_confirm():
             """确认创建"""
