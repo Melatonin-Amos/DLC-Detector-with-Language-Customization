@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 >nul
 echo ========================================
-echo   USB摄像头录制程序
+echo   视频捕获测试程序
 echo ========================================
 echo.
 cd /d "d:\desktop\工程学导论\DLC-Detector-with-Language-Customization"
