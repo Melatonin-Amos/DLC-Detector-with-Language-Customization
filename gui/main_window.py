@@ -268,11 +268,13 @@ class MainWindow:
     def _ensure_initial_geometry(self) -> None:
         """确保窗口以正确的初始尺寸显示"""
         if not self._resize_state["initialized"]:
+            #字典，定义在__init__方法中
             self._resize_state["lock"] = True
 
             # 强制更新几何形状
             center_x = int((self.screen_width - self.target_width) / 2)
             center_y = int((self.screen_height - self.target_height) / 2)
+            #center_x,y在_center_window里面定义
             geometry = f"{self.target_width}x{self.target_height}+{center_x}+{center_y}"
             self.root.geometry(geometry)
             self.root.update_idletasks()
