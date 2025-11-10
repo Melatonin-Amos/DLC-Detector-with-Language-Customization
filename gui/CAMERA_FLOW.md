@@ -9,14 +9,19 @@
            │
            ▼
 ┌──────────────────────┐
-│   选择视频源对话框    │
-│  📷 本地摄像头        │
-│  📡 RTSP网络流       │
+````markdown
+# 摄像头视频流实现逻辑（仅保留本地摄像头）
+
+## � 流程图
+
+```
+┌──────────────────────┐
+│  用户点击"开始检测"   │
 └──────────┬───────────┘
            │
            ▼
 ┌──────────────────────────┐
-│ OpenCV打开摄像头/RTSP流   │ ←── cv2.VideoCapture(0) 或 cv2.VideoCapture(url)
+│ OpenCV打开本地摄像头(0)  │ ←── cv2.VideoCapture(0)
 └──────────┬───────────────┘
            │
            ▼
@@ -51,16 +56,8 @@
            │
            ▼
 ┌──────────────────────────┐
-│ 33ms后继续下一帧 (30fps)  │ ←── root.after(33, update_video_frame)
+│ 17ms后继续下一帧 (60fps)  │ ←── root.after(17, update_video_frame)
 └──────────────────────────┘
-           │
-           │ (循环)
-           └──────────┐
-                      │
-                      ▼
-           ┌──────────────────┐
-           │ 暂停/停止/继续    │
-           └──────────────────┘
 ```
 
 ## 🔑 核心代码实现
@@ -69,22 +66,14 @@
 
 ```python
 def _start_video_stream(self) -> None:
-    # 判断视频源类型
-    if self.rtsp_url == "0":
-        # 本地摄像头 (设备ID为0)
-        self.video_capture = cv2.VideoCapture(0)
-    else:
-        # RTSP网络流
-        self.video_capture = cv2.VideoCapture(self.rtsp_url)
-    
+    # 仅支持本地摄像头 (设备ID为0)
+    self.video_capture = cv2.VideoCapture(0)
     # 设置缓冲区，减少延迟
     self.video_capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-    
     # 检查是否成功打开
     if not self.video_capture.isOpened():
         # 错误处理
         return
-    
     # 启动帧更新循环
     self._update_video_frame()
 ```
@@ -95,139 +84,29 @@ def _start_video_stream(self) -> None:
 def _update_video_frame(self) -> None:
     # ========== 步骤1: 读取视频帧 ==========
     ret, frame = self.video_capture.read()
-    
     if ret:
         # ========== 步骤2: BGR → RGB 转换 ==========
-        # OpenCV使用BGR格式，PIL使用RGB格式
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        
         # ========== 步骤3: 调整大小 ==========
         frame_resized = self._resize_frame(frame_rgb, width, height)
-        
         # ========== 步骤4: 转换为PIL图像 ==========
         image = Image.fromarray(frame_resized)
-        
         # ========== 步骤5: 转换为ImageTk格式 ==========
         photo = ImageTk.PhotoImage(image=image)
-        
         # ========== 步骤6: 在Canvas上显示 ==========
-        self.video_canvas.create_image(
-            width // 2, height // 2,
-            image=photo,
-            anchor=tk.CENTER
-        )
-        
+        self.video_canvas.create_image(width // 2, height // 2, image=photo, anchor=tk.CENTER)
         # 保持引用，防止被垃圾回收
         self.video_canvas.image = photo
-    
-    # ========== 步骤7: 调度下一帧 (30fps) ==========
-    self.update_id = self.root.after(33, self._update_video_frame)
-```
-
-### 3. 调整帧大小 (`_resize_frame`)
-
-```python
-def _resize_frame(self, frame, canvas_width, canvas_height):
-    # 获取原始尺寸
-    frame_height, frame_width = frame.shape[:2]
-    
-    # 计算缩放比例（保持宽高比）
-    width_ratio = canvas_width / frame_width
-    height_ratio = canvas_height / frame_height
-    scale_ratio = min(width_ratio, height_ratio)
-    
-    # 计算新尺寸
-    new_width = int(frame_width * scale_ratio)
-    new_height = int(frame_height * scale_ratio)
-    
-    # 使用OpenCV调整大小
-    resized_frame = cv2.resize(
-        frame, 
-        (new_width, new_height), 
-        interpolation=cv2.INTER_AREA
-    )
-    
-    # 创建黑色背景并居中放置
-    output = np.zeros((canvas_height, canvas_width, 3), dtype=np.uint8)
-    y_offset = (canvas_height - new_height) // 2
-    x_offset = (canvas_width - new_width) // 2
-    output[y_offset:y_offset+new_height, x_offset:x_offset+new_width] = resized_frame
-    
-    return output
-```
-
-## 🎯 关键技术点
-
-### 1. 视频源选择
-- **本地摄像头**: `cv2.VideoCapture(0)` - 0表示默认摄像头
-- **RTSP流**: `cv2.VideoCapture("rtsp://...")` - 传入RTSP URL
-
-### 2. 颜色空间转换
-- **OpenCV**: 默认使用 BGR 格式
-- **PIL/Tkinter**: 使用 RGB 格式
-- **转换**: `cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)`
-
-### 3. 图像格式转换链
-```
-numpy.ndarray (OpenCV) 
-    → PIL.Image (Image.fromarray) 
-    → ImageTk.PhotoImage (ImageTk.PhotoImage) 
-    → Tkinter Canvas
-```
-
-### 4. 帧率控制
-- **目标帧率**: 30fps
-- **刷新间隔**: 33ms (1000ms / 30fps ≈ 33ms)
-- **实现**: `self.root.after(33, self._update_video_frame)`
-
-### 5. 内存管理
-```python
-# 必须保持PhotoImage引用，否则会被垃圾回收导致图像不显示
-self.video_canvas.image = photo
-```
-
-## ⚙️ 配置参数
-
-| 参数 | 值 | 说明 |
-|------|-----|------|
-| CAP_PROP_BUFFERSIZE | 1 | 缓冲区大小，减少延迟 |
-| 帧率 | 30fps | 每秒30帧 |
-| 刷新间隔 | 33ms | 约30fps |
-| 插值算法 | INTER_AREA | 高质量缩放 |
-
-## 🚀 使用示例
-
-### 方式1: 使用本地摄像头
-
-```bash
-# 1. 运行主窗口
-/usr/local/bin/python3 gui/main_window.py
-
-# 2. 点击"▶ 开始检测"
-# 3. 选择"📷 本地摄像头"
-# 4. 摄像头视频开始显示
-```
-
-### 方式2: 使用RTSP流
-
-```bash
-# 1. 运行主窗口
-/usr/local/bin/python3 gui/main_window.py
-
-# 2. 点击"▶ 开始检测"
-# 3. 选择"📡 RTSP网络流"
-# 4. 输入RTSP地址，例如：
-#    rtsp://admin:password@192.168.1.100:554/stream
-# 5. 网络视频开始显示
+    # ========== 步骤7: 调度下一帧 (60fps) ==========
+    self.update_id = self.root.after(17, self._update_video_frame)
 ```
 
 ## 🎮 控制功能
 
 | 操作 | 功能 |
 |------|------|
-| ▶ 开始检测 | 打开视频源选择对话框，启动视频流 |
+| ▶ 开始检测 | 启动本地摄像头并开始显示 |
 | ⏸ 暂停 | 暂停视频播放（不释放资源） |
-| ⏸ 恢复 | 继续播放视频 |
 | ⏹ 停止 | 停止视频流并释放所有资源 |
 
 ## 🔍 调试信息
@@ -239,21 +118,15 @@ self.video_canvas.image = photo
 本地摄像头已启动
 ```
 
-或
-
-```
-正在连接RTSP流: rtsp://...
-RTSP流已启动
-```
-
 ## ⚠️ 注意事项
 
 1. **摄像头权限**: macOS需要授予终端/Python摄像头访问权限
-2. **RTSP连接**: 确保网络可达且认证信息正确
-3. **性能**: 高分辨率视频可能需要更强的CPU
-4. **垃圾回收**: 必须保持PhotoImage的引用
+2. **性能**: 高分辨率视频可能需要更强的CPU
+3. **垃圾回收**: 必须保持PhotoImage的引用
 
 ## 📚 相关文档
 
-- `RTSP_USAGE.md` - RTSP流详细使用说明
 - `main_window.py` - 主窗口实现代码
+
+````
+    frame_height, frame_width = frame.shape[:2]

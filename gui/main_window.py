@@ -59,17 +59,10 @@ class MainWindow:
         # 设置窗口引用
         self.settings_window: Optional[tk.Toplevel] = None
         self.settings_panel: Optional[SettingsPanel] = None
+        # optional 是可选的意思，可以是None，也可以是SettingsPanel类型，还没有实例化
 
         # 持久化配置数据（在关闭主窗口前一直保留）
         self.app_config = {
-            # RTSP配置
-            "rtsp": {
-                "url": "rtsp://",
-                "username": "",
-                "password": "",
-                "port": "554",
-                "timeout": "10",
-            },
             # 场景配置
             "scene": {
                 "scene_type": "摔倒",
@@ -83,12 +76,13 @@ class MainWindow:
             "scene_types": ["摔倒", "起火"],
         }
 
-        # 视频流相关变量
+        # 初始化视频流相关变量
         self.video_capture: Optional[cv2.VideoCapture] = None
         self.is_playing: bool = False
         self.is_paused: bool = False
-        self.rtsp_url: str = ""
         self.update_id: Optional[str] = None  # 用于存储after的返回ID
+        # 做了类型标注（bool\str]）
+        # cv2.VideoCapture() 可以传入：1.视频文件路径（如 "video.mp4"）2.摄像头索引（整数，0、1…）3.网络视频流地址（如 RTSP URL "rtsp://..."）
 
         # 初始化GUI组件，在init时自动调用
         self._setup_window()
@@ -123,16 +117,19 @@ class MainWindow:
         try:
             icon = Image.open("gui/kawaii_icon.png")
             photo = ImageTk.PhotoImage(icon)
+            # 把图片转换成Tkinter能用的格式
             self.root.wm_iconphoto(True, photo)
         except Exception as e:
             print(f"无法加载图标: {e}")
+            # try：尝试执行里面的代码，如果出错不会报错直接终止程序     except Exception as e:：捕获任意异常，并把异常对象赋值给 e
+            # self.root.wm_iconphoto(True, photo)   第一个参数 True：表示同时设置 主窗口和任务栏图标    第二个参数 photo：要设置的图标对象
 
     def _center_window(self, window: tk.Toplevel, width: int, height: int) -> None:
         """
         将窗口居中显示在屏幕上
 
         Args:
-            window: 要居中的窗口
+            window: 要居中的窗口（注:tk.Toplevel是一种数据类型,表示顶级窗口）
             width: 窗口宽度
             height: 窗口高度
         """
@@ -151,7 +148,13 @@ class MainWindow:
         """创建所有GUI组件"""
         # 创建主框架
         self.main_frame = ttk.Frame(self.root, padding="20")
+        # ttk.Frame：Tkinter 的 ttk 模块提供的 Frame 控件，用来作为容器，放置其他控件。
+        # self.root：父容器，Frame 会被放在主窗口中。
+        # padding="20"：给 Frame 内部四周添加 20 像素的内边距（上下左右都加）。
         self.main_frame.grid(row=0, column=0, sticky="nsew")
+        # sticky="nsew" n = north（上） s = south（下） e = east（右） w = west（左）
+        # 组合 nsew 表示让 Frame 填满整个单元格，上下左右都拉伸。
+        # grid是对这个frame进行布局管理，把frame放在主窗口的第0行第0列
         self.main_frame.grid_rowconfigure(0, weight=1)
         self.main_frame.grid_columnconfigure(0, weight=1)
 
@@ -161,13 +164,16 @@ class MainWindow:
         # 创建控制按钮区域
         self._create_control_buttons()
 
-    def _create_video_frame(self) -> None:
+    def _create_video_frame(self) -> None:  # 内部方法
         """创建视频显示区域"""
         # 视频框架
         self.video_frame = ttk.LabelFrame(
             self.main_frame, text="📹 实时视频预览", padding="10"
-        )
+        )  # LabelFrame：带标题的框架
+        # self.main_frame：父容器，视频框架放在主框架内
+        # text="📹 实时视频预览"：框架标题
         self.video_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        # 对视频框架做布局管理，放在主框架的第0行第0列
 
         # 视频画布
         self.video_canvas = tk.Canvas(
@@ -176,7 +182,11 @@ class MainWindow:
             highlightthickness=2,
             highlightbackground="#4a4a4a",
         )
+        # tk.Canvas(父容器,背景颜色,边框厚度,边框颜色)
         self.video_canvas.pack(padx=5, pady=5, expand=True)
+        # pack()：使用pack布局管理器，把画布放在视频框架内
+        # padx=5, pady=5：给画布外部添加5像素的水平和垂直间距
+        # expand=True：允许画布在框架内扩展以填满可用空间(自适应窗口大小变化)
 
         # 占位提示文字
         self.placeholder_text = self.video_canvas.create_text(
@@ -187,6 +197,8 @@ class MainWindow:
             fill="#888888",
             justify="center",
         )
+        # self.placeholder_text：保存文本对象的引用，以便后续更新位置(实例对象)
+        # create_text((文字起始位置）x坐标, y坐标, text="文字内容", font=(字体, 大小), fill=颜色，对齐方式（居中）)
 
     def _create_control_buttons(self) -> None:
         """创建控制按钮"""
@@ -207,7 +219,9 @@ class MainWindow:
             width=15,
             command=self._on_start_detection,
         )
+        # （父容器,按钮文字,按钮宽度,点击回调函数）
         self.btn_start.pack(side="left", padx=5)
+        # 这里的side是堆叠方式，可以从上下左右堆叠（side="top"），这里是从左往右堆叠，padx是按钮间距
 
         self.btn_pause = ttk.Button(
             button_container, text="⏸ 暂停", width=15, command=self._on_pause
@@ -228,31 +242,39 @@ class MainWindow:
         """绑定事件处理器"""
         self.root.bind("<Configure>", self._on_window_resize)
         self.root.protocol("WM_DELETE_WINDOW", self._on_window_close)
+        # widget.bind(event, callback)当主窗口的大小、位置或布局发生变化时("<<Configure>>"，执行回调函数 _on_window_resize。
 
     def _update_video_layout(self, window_width: int, window_height: int) -> None:
         """更新视频画布布局以保持16:9比例"""
         available_width = max(320, window_width - 160)
         available_height = max(180, window_height - 240)
+        # 可使用的宽和高
 
         width_from_height = int(available_height * self.VIDEO_RATIO)
         canvas_width = min(available_width, width_from_height)
         canvas_height = int(canvas_width / self.VIDEO_RATIO)
 
         self.video_canvas.config(width=canvas_width, height=canvas_height)
+        # widget.config(option1=value1, option2=value2, ...)（修改组件属性）
         self.video_canvas.coords(
             self.placeholder_text,
             canvas_width // 2,
             canvas_height // 2,
         )
+        # coords() 是 Canvas 专用的方法，用于获取或设置画布上图形对象的坐标。
+        # 设置坐标canvas.coords(item_id, x1, y1, x2, y2, ...)
+        # 获取坐标coords = canvas.coords(item_id)
 
     def _ensure_initial_geometry(self) -> None:
         """确保窗口以正确的初始尺寸显示"""
         if not self._resize_state["initialized"]:
+            #字典，定义在__init__方法中
             self._resize_state["lock"] = True
 
             # 强制更新几何形状
             center_x = int((self.screen_width - self.target_width) / 2)
             center_y = int((self.screen_height - self.target_height) / 2)
+            #center_x,y在_center_window里面定义
             geometry = f"{self.target_width}x{self.target_height}+{center_x}+{center_y}"
             self.root.geometry(geometry)
             self.root.update_idletasks()
@@ -332,59 +354,8 @@ class MainWindow:
             print("恢复播放...")
             return
 
-        # 弹出选择对话框：RTSP流 或 本地摄像头
-        choice_dialog = tk.Toplevel(self.root)
-        choice_dialog.title("选择视频源")
-        choice_dialog.resizable(False, False)
-
-        # 设置窗口大小为主窗口的50%并居中显示
-        dialog_width = int(self.root.winfo_width() * 0.5)
-        dialog_height = int(self.root.winfo_height() * 0.5)
-        self._center_window(choice_dialog, dialog_width, dialog_height)
-
-        # 设置为模态窗口
-        choice_dialog.transient(self.root)
-        choice_dialog.grab_set()
-
-        # 创建选择框架
-        frame = ttk.Frame(choice_dialog, padding="20")
-        frame.pack(fill=tk.BOTH, expand=True)
-
-        ttk.Label(frame, text="请选择视频源类型:", font=("Arial", 12, "bold")).pack(
-            pady=(5, 20)
-        )
-
-        # 按钮容器
-        button_frame = ttk.Frame(frame)
-        button_frame.pack(expand=True, pady=(0, 10))
-
-        def on_camera():
-            choice_dialog.destroy()
-            self.rtsp_url = "0"  # 使用摄像头ID
-            self._start_video_stream()
-
-        def on_rtsp():
-            choice_dialog.destroy()
-            # 简单对话框获取RTSP URL
-            from tkinter import simpledialog
-
-            self.rtsp_url = simpledialog.askstring(
-                "RTSP设置",
-                "请输入RTSP流地址:",
-                initialvalue="rtsp://admin:password@192.168.1.100:554/stream",
-            )
-            if self.rtsp_url:
-                self._start_video_stream()
-            else:
-                messagebox.showwarning("警告", "未设置RTSP地址")
-
-        ttk.Button(
-            button_frame, text="📷 本地摄像头", command=on_camera, width=18, padding=8
-        ).pack(side=tk.LEFT, padx=10)
-
-        ttk.Button(
-            button_frame, text="📡 RTSP网络流", command=on_rtsp, width=18, padding=8
-        ).pack(side=tk.LEFT, padx=10)
+        # 仅保留本地摄像头功能：直接启动默认摄像头
+        self._start_video_stream()
 
     def _on_pause(self) -> None:
         """暂停按钮回调"""
@@ -472,15 +443,9 @@ class MainWindow:
             if self.video_capture is not None:
                 self.video_capture.release()
 
-            # 判断是摄像头还是RTSP流
-            if self.rtsp_url == "0":
-                # 本地摄像头
-                print("正在打开本地摄像头...")
-                self.video_capture = cv2.VideoCapture(0)  # 0 表示默认摄像头
-            else:
-                # RTSP网络流
-                print(f"正在连接RTSP流: {self.rtsp_url}")
-                self.video_capture = cv2.VideoCapture(self.rtsp_url)
+            # 仅支持本地摄像头（设备ID 0）
+            print("正在打开本地摄像头...")
+            self.video_capture = cv2.VideoCapture(0)  # 0 表示默认摄像头
 
             # 设置缓冲区大小，减少延迟
             self.video_capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
@@ -504,8 +469,7 @@ class MainWindow:
             # 开始更新视频帧
             self._update_video_frame()
 
-            source_type = "本地摄像头" if self.rtsp_url == "0" else "RTSP流"
-            print(f"{source_type}已启动")
+            print("本地摄像头已启动")
 
         except Exception as e:
             messagebox.showerror("错误", f"启动视频流失败:\n{str(e)}")
@@ -627,8 +591,8 @@ class MainWindow:
                     messagebox.showwarning("警告", "视频流连接中断")
                     return
 
-            # 继续调度下一帧更新（约30fps，33ms一帧）
-            self.update_id = self.root.after(33, self._update_video_frame)
+            # 继续调度下一帧更新（约60fps，17ms一帧）
+            self.update_id = self.root.after(17, self._update_video_frame)
 
         except Exception as e:
             print(f"更新视频帧错误: {e}")
