@@ -1,4 +1,5 @@
 # DLC-Detector-with-Language-Customization
+
 这是我们 [工程学导论（ME1221）](https://oc.sjtu.edu.cn/courses/84663) 课程项目的版本管理仓库，本项目旨在实现一个基于CLIP的支持语义客制化的智能养老摄像头模块的硬件支持性开发、后端VLM开发以及前端开发。技术上，我们使用大规模语义预训练的CLIP模型，采用ViT作为视觉编码器，Vanilla Transformer作为语义编码器，zero-shot地进行场景识别，从而实现高度个性化的智能功能。
 
 ![DLC全栈技术流程图](./doc_asset/image/DLC.png)
@@ -14,15 +15,27 @@ TODO：
 - [x] 【Throughout】咕咕咕呜呜呜哇哇哇
 - [x] 【1023左右】技术对齐会议（课上）
 - 【周度进度安排】1030课前
-  - [ ] （**wty**）本周参考课件/建议书/课上说明购买：摄像头、摄像头架（预算300元左右，注意问老师报销规范，注意确保支持编程，尽量不要退货/重买），下周尽量带来课堂。
-  - [ ] （**whk**）参考项目建议书进行背景等非技术部分的写作构思。
-  - [ ] （**whk、wty**）假如有意愿进行开发，请按照本README文件的“第一步”“第二步”“第三步”进行环境配置与基础构建（关键节点：conda的完善、Copilot可以显示高级模型，创建自己的开发branch），从而支持后续的开发，在这个过程中如果遇到困难甚至痛苦，不用勉强/坐牢，是整个过程比较顺利，下周可以讨论各自负责的开发部分。
-  - [ ] （**lxr**）对于前端与GUI的实现进行初步尝试与技术调研，在下周形成比较明确的想法和设计思路。
-  - [ ] （**jhy**）对于Pytorch、NLP、Vanilla Transformer进行回顾与熟悉，掌握项目Pipeline，构思相机支持性开发。
-  - [ ] （**jyy**）尝试对现有的CLIP（ViT + Vanilla Transformer）实现进行进一步厘清，完善现有的接口和注册，支持两端的开发。
-- [ ] [视频捕获模块](src/core/video_capture.py) → 调用detector.detect(frame)
-- [ ] [警报管理器](src/core/alert_manager.py) → 接收result字典
+  - [x] （**wty**）本周参考课件/建议书/课上说明购买：摄像头、摄像头架（预算300元左右，注意问老师报销规范，注意确保支持编程，尽量不要退货/重买），下周尽量带来课堂。
+  - [x] （**whk**）参考项目建议书进行背景等非技术部分的写作构思。
+  - [x] （**whk、wty**）假如有意愿进行开发，请按照本README文件的“第一步”“第二步”“第三步”进行环境配置与基础构建（关键节点：conda的完善、Copilot可以显示高级模型，创建自己的开发branch），从而支持后续的开发，在这个过程中如果遇到困难甚至感受到痛苦，不用勉强/坐牢，要是整个过程比较顺利，下周可以讨论各自负责的开发部分。我们的宗旨是**不要感受到坐牢**（非常真诚的），要是能开发当然欢迎，要是感觉太累了完全没必要硬撑。
+  - [x] （**lxr**）对于前端与GUI的实现进行初步尝试与技术调研，在下周形成比较明确的想法和设计思路。
+  - [x] （**jhy**）对于Pytorch、NLP、Vanilla Transformer进行回顾与熟悉，掌握项目Pipeline，构思相机支持性开发。
+  - [x] （**jyy**）尝试对现有的CLIP（ViT + Vanilla Transformer）实现进行进一步厘清，完善现有的接口和注册，支持两端的开发。
+- 【周度进度安排】1106课前
+  - [ ] （**wty**）【产出：请将视频脚本发在群里（要是时间上有困难请及时说）】设计demo视频的脚本，学习短平快的学术性视频风格（可以上一些学术工作的项目网站看他们的demo视频风格，可以在youtube上搜索...）
+  - [ ] （**whk**）【产出：请产出一个结项报告的框架，细分到各级目录都放什么】请学习 $\LaTeX$ ，尽量能够确保课前能够比较熟练地使用，并且参考国自然等基金项目的结项报告设计，以及参考[传承交大上的往年课程高分资料](https://share.dyweb.sjtu.cn/course/16577)进行我们结项报告的结构设计————这个工作非常重要，会很大影响到我们的成绩，请稍微花一些心思进行设计。
+  - [ ] （**lxr**）请继续实现前端与GUI，希望、预计11月20日（第10周周四）之前实现自己部分的所有功能。注意，对于自己开发部分的内容，请留下文档（可以写在本[README](README.md)文档的最后部分，接续在infra文档后面），介绍主要的功能和接口，方便与其他同学协作开发。
+  - [ ] （**jhy**）请尝试使用已经购置的摄像头进行`RTSP_stream`的处理，在既有Infra上实现实时视频流的处理，并且留下文档（也就是完成相机支持性开发），提出Pull Request。要是有困难请及时交流。
+  - [ ] （**jyy**）处理Pull Request，利用和串贯当前实现的接口，对两类流的ViT（Encoder）debug，做兼容处理。
+- 【周度进度安排】第九周周三高数期中考，以及存在一些其他考试，第九周有考试的同学在**本周(指11/06 - 11/13)不安排任务**，考试加油~
+  - [x] （**jhy**）✅ 已完成相机支持性开发：实现摄像头实时录制、本地视频处理、固定间隔抽帧功能，所有参数可通过 `camera_config.yaml` 配置。
+  - [ ] （**wty**）【第八周：请将视频脚本发在群里（要是时间上有困难请及时说）】设计demo视频的脚本，学习短平快的学术性视频风格（可以上一些学术工作的项目网站看他们的demo视频风格，可以在youtube上搜索...）
+  - [ ] （**whk**）【第八周：请产出一个结项报告的框架，细分到各级目录都放什么】请学习 $\LaTeX$ ，尽量能够确保课前能够比较熟练地使用，并且参考国自然等基金项目的结项报告设计，以及参考[传承交大上的往年课程高分资料](https://share.dyweb.sjtu.cn/course/16577)进行我们结项报告的结构设计————这个工作非常重要，会很大影响到我们的成绩，请稍微花一些心思进行设计。
+  - [ ] （**lxr**）调整摄像头相关的调用方式，改RTSP为直连；按照现在默认分支的接口状况调整一下自己的实现，方便后续开发。
+- [x] [视频捕获模块](src/core/video_capture.py) → ✅ 已完成（摄像头录制 + 本地视频处理 + 抽帧）
+- [ ] 集成检测器：video_capture → detector.detect(frame)
 - [ ] [主程序](main.py) → 整合所有模块
+
 
 
 ## 写在前面：环境配置与基础构建
@@ -81,7 +94,7 @@ TODO：
 项目需要支持两类输入源，均存放在 `assets/` 文件夹下：
 
 1. **实时视频流** (`assets/rtsp_streams/`)
-   - 从海康威视相机模块读取RTSP协议流
+   - 从海康威视相机模块读取视频流
    - 支持不同分辨率（如720p, 1080p等）
    - 实时抽取关键帧进行处理
 
@@ -98,23 +111,20 @@ TODO：
 DLC-Detector-with-Language-Customization/
 │
 ├── assets/                          # 输入资源目录
-│   ├── rtsp_streams/               # RTSP实时流配置
-│   │   ├── stream_configs.json    # 流地址和参数配置
-│   │   └── README.md              # RTSP流使用说明
 │   └── test_videos/               # 测试视频文件
 │       ├── fall_detection/        # 跌倒检测测试视频
 │       ├── fire_detection/        # 火灾检测测试视频
 │       └── normal_scenarios/      # 正常场景视频
 │
 ├── config/                         # 配置文件目录
-│   ├── camera_config.yaml         # 相机参数配置
+│   ├── camera_config.yaml         # 相机参数配置 ✅
 │   ├── model_config.yaml          # CLIP模型配置
 │   └── detection_config.yaml      # 检测阈值和场景配置
 │
 ├── data/                          # 数据目录
 │   ├── logs/                      # 运行日志
 │   ├── models/                    # 预训练模型存放
-│   │   └── clip/                 # CLIP模型权重
+│   │   └── clip/                  # CLIP模型权重
 │   └── outputs/                   # 输出结果
 │       ├── alerts/               # 警报记录
 │       └── frames/               # 提取的关键帧
@@ -124,7 +134,7 @@ DLC-Detector-with-Language-Customization/
 │   │
 │   ├── core/                      # 核心功能模块
 │   │   ├── __init__.py
-│   │   ├── video_capture.py      # 视频捕获和关键帧提取
+│   │   ├── video_capture.py      # 视频捕获和关键帧提取 ✅
 │   │   ├── clip_detector.py      # CLIP模型检测器
 │   │   └── alert_manager.py      # 警报管理器
 │   │
@@ -146,8 +156,10 @@ DLC-Detector-with-Language-Customization/
 │
 ├── scripts/                       # 脚本目录
 │   ├── download_models.py        # 下载预训练模型
-│   ├── test_camera.py            # 测试相机连接
+│   ├── test_camera.py            # 视频捕获测试脚本 ✅
 │   └── run_demo.py               # 运行演示
+│
+├── start_camera.bat               # Windows快捷启动脚本 ✅
 │
 ├── tests/                         # 测试代码
 │   ├── test_video_capture.py    # 视频捕获测试
@@ -170,44 +182,77 @@ DLC-Detector-with-Language-Customization/
 
 ### 3. 技术实现方案
 
-#### 3.1 视频捕获与关键帧提取
+#### 3.1 视频捕获与关键帧提取 ✅ [已实现]
 
-**输入源处理**：
+**核心模块**：`src/core/video_capture.py`
 
-```python
-# 伪代码示意
-class VideoCapture:
-    def __init__(self, source_type, source_path):
-        """
-        source_type: 'rtsp' 或 'video'
-        source_path: RTSP URL 或 视频文件路径
-        """
-        pass
-    
-    def get_frame(self):
-        """获取下一帧"""
-        pass
-    
-    def extract_keyframes(self, method='interval'):
-        """
-        提取关键帧
-        method: 'interval' (固定间隔) 或 'scene' (场景变化)
-        """
-        pass
+**配置文件**：`config/camera_config.yaml`
+
+**功能特性**：
+
+1. **摄像头实时录制**
+   - 支持USB摄像头连接（索引可配置）
+   - 按 **S** 键开始录制，按 **Q** 键停止
+   - 自动保存完整视频和抽帧结果
+   - 文件前缀：`LIVE_*` 
+
+2. **本地视频处理**
+   - 输入视频文件路径进行处理
+   - 按固定时间间隔（默认0.5秒）抽帧
+   - 自动保存处理后视频和抽帧结果
+   - 文件前缀：`LOCAL_*`
+
+**快速使用**：
+
+```bash
+# 运行测试脚本
+python scripts/test_camera.py
+
+# 选择功能：
+# 1 - 摄像头录制
+# 2 - 本地视频处理
 ```
 
-**关键帧提取策略**：
+**核心接口**：
 
-1. **固定间隔法**（优先实现）
-   - 每隔N帧提取一帧（N可配置，建议30-60）
-   - 优点：简单高效
-   - 缺点：可能错过短暂事件
+```python
+from src.core.video_capture import VideoCapture
 
-2. **场景变化检测法**（可选优化，怪复杂的，我（金抑扬）不是很建议）
-   - 计算相邻帧的差异（如直方图差异）
-   - 超过阈值则认为场景变化，提取关键帧
-   - 优点：更智能，不会遗漏重要时刻
-   - 缺点：计算量稍大
+# 创建对象（自动从配置文件加载参数）
+capture = VideoCapture()
+
+# 摄像头录制模式（含S键开始、Q键停止）
+capture.start_camera_recording()
+
+# 本地视频处理模式（提示输入路径）
+capture.process_local_video()
+
+# 释放资源
+capture.release()
+```
+
+**配置说明**（`camera_config.yaml`）：
+
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| `camera_index` | 摄像头索引 | 1 |
+| `target_width` | 目标宽度 | 1920 |
+| `target_height` | 目标高度 | 1080 |
+| `extract_interval` | 抽帧间隔（秒） | 0.5 |
+| `video_save_dir` | 视频保存目录 | D:/Video_Records |
+| `frame_save_dir` | 抽帧保存目录 | D:/Frames_Analysis |
+
+**输出文件结构**：
+
+```
+D:/Video_Records/
+├── LIVE_20251106_123456.mp4      # 实时录制
+└── LOCAL_20251106_123457.mp4     # 本地视频处理
+
+D:/Frames_Analysis/
+├── LiveFrame_20251106_123456/    # 实时录制抽帧
+└── LocalFrame_20251106_123457/   # 本地视频抽帧
+```
 
 ---
 
@@ -216,6 +261,15 @@ class VideoCapture:
 **模型选择**：
 - **OpenAI CLIP**: `openai/clip-vit-base-patch32`
 - **OpenCLIP**: `laion/CLIP-ViT-B-32-laion2B-s34B-b79K` (更大规模预训练)
+
+**快速了解原理**：
+
+- [快速了解Transformer（但是视频中有一处错误）](https://www.bilibili.com/video/BV1dyW9zsEk1?vd_source=fea757cded14707bcd60c2e78d0c58ba)
+- [稍微慢速一点了解Transformer](https://www.bilibili.com/video/BV1xoJwzDESD?vd_source=fea757cded14707bcd60c2e78d0c58ba)
+- [快速了解ViT及其在VLM中的作用](https://www.bilibili.com/video/BV1gnWdzSEzY?spm_id_from=333.788.recommend_more_video.0&trackid=web_related_0.router-related-2206146-5nk2d.1761735178765.390&vd_source=d6c101018355a1105cd81c932cad93c4)
+- [再稍微慢速一点了解Transformer（9个视频）](https://www.youtube.com/watch?v=aircAruvnKk&list=PLZHQObOWTQDNU6R1_67000Dx_ZCJB-3pi)
+
+更详细的了解建议学习《动手学深度学习》全书（以及一些更加前置的教程）后去读原论文，预计需要三个月到一年的课余时间，不用着急，这并不适合本课程项目的进度设置。这里只是进行一些陈列，以飨感到好奇的同学。
 
 **检测流程**：
 
@@ -324,9 +378,8 @@ detection:
   
   # 关键帧提取
   keyframe:
-    method: "interval"  # interval 或 scene
-    interval: 30  # 每30帧提取一次
-    scene_threshold: 0.3  # 场景变化阈值
+    method: "interval"  # interval
+    interval: 0.5 #每0.5秒提取一帧关键帧
 
 # 警报配置
 alert:
@@ -371,25 +424,134 @@ pip install -r requirements.txt
 python scripts/download_models.py
 ```
 
-##### 4.2.2 运行测试
+##### 4.2.2 测试视频捕获模块 ✅
 
 ```bash
-# 测试相机连接
+# 方式1：运行测试脚本（交互式菜单）
 python scripts/test_camera.py
 
-# 运行demo
-python scripts/run_demo.py --source video --path assets/test_videos/fall_detection/test1.mp4
+# 方式2：双击批处理文件（Windows）
+# 双击 start_camera.bat
+
+# 选择功能：
+# 1 - 摄像头录制（按S开始，按Q停止）
+# 2 - 本地视频处理（输入文件路径）
+# 0 - 退出程序
 ```
 
-##### 4.2.3 运行主程序
+##### 4.2.3 运行主程序（开发中）
 
 ```bash
-# 使用RTSP流
-python main.py --source rtsp --config config/detection_config.yaml
+# 使用摄像头
+python main.py --source camera
 
-# 使用测试视频
+# 使用本地视频
 python main.py --source video --path assets/test_videos/fall_detection/test1.mp4
 ```
+
+---
+
+---
+
+### 5. 相机支持性开发文档 ✅ [JHY]
+
+#### 5.1 模块概述
+
+**开发分支**：`jhy_dev`  
+**核心文件**：
+- `src/core/video_capture.py` - 视频捕获核心模块
+- `config/camera_config.yaml` - 配置文件
+- `scripts/test_camera.py` - 测试脚本
+
+#### 5.2 功能说明
+
+**支持的功能**：
+1. ✅ USB摄像头实时录制（按S开始，按Q停止）
+2. ✅ 本地视频文件处理和抽帧
+3. ✅ 固定时间间隔抽帧（默认0.5秒）
+4. ✅ 自动保存视频和抽帧结果
+5. ✅ 文件命名前缀区分（LIVE/LOCAL）
+
+#### 5.3 使用示例
+
+```python
+from src.core.video_capture import VideoCapture
+
+# 创建捕获器（从配置文件加载参数）
+capture = VideoCapture()
+
+# 方式1：摄像头录制
+capture.start_camera_recording()
+
+# 方式2：本地视频处理
+capture.process_local_video()
+
+# 释放资源
+capture.release()
+```
+
+#### 5.4 配置参数
+
+编辑 `config/camera_config.yaml` 修改参数：
+
+```yaml
+camera:
+  camera_index: 1        # 摄像头索引（0, 1, 2...）
+  target_width: 1920     # 分辨率
+  target_height: 1080
+
+video:
+  extract_interval: 0.5  # 抽帧间隔（秒）
+  codec: 'mp4v'          # 视频编码
+  default_fps: 30.0      # 默认帧率
+
+paths:
+  video_save_dir: 'D:/Video_Records'
+  frame_save_dir: 'D:/Frames_Analysis'
+```
+
+#### 5.5 接口说明
+
+**主要方法**：
+
+| 方法 | 说明 | 返回值 |
+|------|------|--------|
+| `start_camera_recording()` | 启动摄像头录制模式 | List[Tuple] |
+| `process_local_video()` | 处理本地视频文件 | List[Tuple] |
+| `extract_keyframes(max_frames)` | 提取关键帧 | List[Tuple] |
+| `release()` | 释放资源 | None |
+
+**返回格式**：
+```python
+keyframes = [(frame_index, frame_image), ...]
+# frame_index: int - 帧索引
+# frame_image: np.ndarray - 帧图像数据
+```
+
+#### 5.6 下游对接
+
+**供其他模块调用**：
+
+```python
+# 在主程序或检测模块中
+from src.core.video_capture import VideoCapture
+
+capture = VideoCapture()
+
+# 启动摄像头并获取关键帧
+keyframes = capture.start_camera_recording()
+
+# 遍历关键帧进行检测
+for frame_idx, frame in keyframes:
+    # 调用检测器
+    results = detector.detect(frame)
+    # 处理结果...
+```
+
+**注意事项**：
+- 按Q键会停止录制并返回已抽取的关键帧
+- 所有文件自动按时间戳命名，无需手动指定
+- 支持上下文管理器：`with VideoCapture() as cap: ...`
 
 ---
 
@@ -397,6 +559,7 @@ python main.py --source video --path assets/test_videos/fall_detection/test1.mp4
   - CLIP实践教程: https://huggingface.co/docs/transformers/model_doc/clip
   - OpenCV视频处理: https://docs.opencv.org/4.x/dd/d43/tutorial_py_video_display.html
 
+***
 
 
 ---
@@ -788,7 +951,7 @@ def _set_roi_area(self):
 
 ---
 
-**GUI模块开发者**: LXR  
+**GUI模块开发者**: LXR
 **最后更新**: 2025年11月9日
 
 
