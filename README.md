@@ -5,6 +5,26 @@
 
 ***
 
+## 进度管理小清单
+
+TODO：
+
+- [x] 【1019前】实现infra
+- [x] 【1023左右】写infra的文档
+- [x] 【Throughout】咕咕咕呜呜呜哇哇哇
+- [x] 【1023左右】技术对齐会议（课上）
+- 【周度进度安排】1030课前
+  - [ ] （**wty**）本周参考课件/建议书/课上说明购买：摄像头、摄像头架（预算300元左右，注意问老师报销规范，注意确保支持编程，尽量不要退货/重买），下周尽量带来课堂。
+  - [ ] （**whk**）参考项目建议书进行背景等非技术部分的写作构思。
+  - [ ] （**whk、wty**）假如有意愿进行开发，请按照本README文件的“第一步”“第二步”“第三步”进行环境配置与基础构建（关键节点：conda的完善、Copilot可以显示高级模型，创建自己的开发branch），从而支持后续的开发，在这个过程中如果遇到困难甚至痛苦，不用勉强/坐牢，是整个过程比较顺利，下周可以讨论各自负责的开发部分。
+  - [ ] （**lxr**）对于前端与GUI的实现进行初步尝试与技术调研，在下周形成比较明确的想法和设计思路。
+  - [ ] （**jhy**）对于Pytorch、NLP、Vanilla Transformer进行回顾与熟悉，掌握项目Pipeline，构思相机支持性开发。
+  - [ ] （**jyy**）尝试对现有的CLIP（ViT + Vanilla Transformer）实现进行进一步厘清，完善现有的接口和注册，支持两端的开发。
+- [ ] [视频捕获模块](src/core/video_capture.py) → 调用detector.detect(frame)
+- [ ] [警报管理器](src/core/alert_manager.py) → 接收result字典
+- [ ] [主程序](main.py) → 整合所有模块
+
+
 ## 写在前面：环境配置与基础构建
 
 ### 第一步：构建VSCode与Python (Conda)开发环境
@@ -377,17 +397,7 @@ python main.py --source video --path assets/test_videos/fall_detection/test1.mp4
   - CLIP实践教程: https://huggingface.co/docs/transformers/model_doc/clip
   - OpenCV视频处理: https://docs.opencv.org/4.x/dd/d43/tutorial_py_video_display.html
 
-TODO：
 
-- [x] 【1019前】实现infra
-- [x] 【1023左右】写infra的文档
-- [x] 【Throughout】咕咕咕呜呜呜哇哇哇
-- [ ] 【1023左右】技术对齐会议（课上）
-- [ ] 采买工作
-- [ ] 背景 etc. 写作
-- [ ] [视频捕获模块](src/core/video_capture.py) → 调用detector.detect(frame)
-- [ ] [警报管理器](src/core/alert_manager.py) → 接收result字典
-- [ ] [主程序](main.py) → 整合所有模块
 
 ---
 
