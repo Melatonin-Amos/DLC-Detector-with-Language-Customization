@@ -384,7 +384,6 @@ class SettingsPanel:
             messagebox.showinfo(
                 "创建成功", f"场景 '{scene_name}' 已成功创建", parent=dialog
             )
-
             dialog.destroy()
 
         def on_cancel():
@@ -464,6 +463,230 @@ class SettingsPanel:
 
         messagebox.showinfo("保存成功", "场景配置已保存")
         print(f"场景配置已保存到app_config: {self.app_config['scene']}")
+
+    # ========== 对外公开接口 ==========
+
+    def get_current_scene_type(self) -> str:
+        """
+        获取当前选中的场景类型
+
+        Returns:
+            str: 场景类型名称（如 "摔倒"、"起火"等）
+
+        Example:
+            >>> panel = SettingsPanel(root)
+            >>> scene = panel.get_current_scene_type()
+            >>> print(scene)  # "摔倒"
+        """
+        return self.scene_type_var.get()
+
+    def get_all_scene_types(self) -> list[str]:
+        """
+        获取所有可用的场景类型列表
+
+        Returns:
+            list[str]: 场景类型列表，包含内置场景和用户自定义场景
+
+        Example:
+            >>> panel = SettingsPanel(root)
+            >>> scenes = panel.get_all_scene_types()
+            >>> print(scenes)  # ["摔倒", "起火", "闯入"]
+        """
+        return self.scene_types.copy()
+
+    def get_scene_config(self) -> Dict:
+        """
+        获取当前场景的完整配置
+
+        Returns:
+            Dict: 包含所有场景参数的字典
+
+        Dictionary Structure:
+            {
+                "scene_type": str,           # 场景类型（如"摔倒"）
+                "light_condition": str,      # 光照条件：'bright' | 'normal' | 'dim'
+                "enable_roi": bool,          # 是否启用ROI
+                "enable_sound": bool,        # 是否启用声音报警
+                "enable_email": bool,        # 是否启用邮件通知
+                "auto_record": bool,         # 是否自动录像
+            }
+
+        Example:
+            >>> panel = SettingsPanel(root)
+            >>> config = panel.get_scene_config()
+            >>> print(config["scene_type"])       # "摔倒"
+            >>> print(config["light_condition"])  # "normal"
+            >>> print(config["enable_roi"])       # False
+        """
+        return {
+            "scene_type": self.scene_type_var.get(),
+            "light_condition": self.light_condition_var.get(),
+            "enable_roi": self.enable_roi_var.get(),
+            "enable_sound": self.enable_sound_var.get(),
+            "enable_email": self.enable_email_var.get(),
+            "auto_record": self.auto_record_var.get(),
+        }
+
+    def get_light_condition(self) -> str:
+        """
+        获取当前光照条件设置
+
+        Returns:
+            str: 光照条件，可能的值: 'bright'（明亮）、'normal'（正常）、'dim'（昏暗）
+
+        Example:
+            >>> panel = SettingsPanel(root)
+            >>> light = panel.get_light_condition()
+            >>> if light == "dim":
+            ...     # 调整检测算法的灵敏度
+        """
+        return self.light_condition_var.get()
+
+    def get_roi_settings(self) -> Dict:
+        """
+        获取ROI（感兴趣区域）相关设置
+
+        Returns:
+            Dict: ROI设置字典
+
+        Dictionary Structure:
+            {
+                "enabled": bool,     # 是否启用ROI
+                "coordinates": None  # ROI坐标（待实现，目前为None）
+            }
+
+        Example:
+            >>> panel = SettingsPanel(root)
+            >>> roi = panel.get_roi_settings()
+            >>> if roi["enabled"]:
+            ...     # 只在ROI区域内进行检测
+            ...     coords = roi["coordinates"]
+        """
+        return {
+            "enabled": self.enable_roi_var.get(),
+            "coordinates": None,  # TODO: 实现ROI坐标存储
+        }
+
+    def get_alert_settings(self) -> Dict:
+        """
+        获取报警设置
+
+        Returns:
+            Dict: 报警设置字典
+
+        Dictionary Structure:
+            {
+                "sound": bool,    # 是否启用声音报警
+                "email": bool,    # 是否启用邮件通知
+                "record": bool,   # 是否自动录像
+            }
+
+        Example:
+            >>> panel = SettingsPanel(root)
+            >>> alerts = panel.get_alert_settings()
+            >>> if alerts["sound"]:
+            ...     play_alert_sound()
+            >>> if alerts["email"]:
+            ...     send_email_notification()
+            >>> if alerts["record"]:
+            ...     start_recording()
+        """
+        return {
+            "sound": self.enable_sound_var.get(),
+            "email": self.enable_email_var.get(),
+            "record": self.auto_record_var.get(),
+        }
+
+    def set_scene_type(self, scene_type: str) -> bool:
+        """
+        以编程方式设置场景类型（供外部调用）
+
+        Args:
+            scene_type: 场景类型名称
+
+        Returns:
+            bool: 设置成功返回True，场景不存在返回False
+
+        Example:
+            >>> panel = SettingsPanel(root)
+            >>> success = panel.set_scene_type("起火")
+            >>> if success:
+            ...     print("场景切换成功")
+        """
+        if scene_type in self.scene_types:
+            self.scene_type_var.set(scene_type)
+            return True
+        return False
+
+    def add_scene_type(self, scene_name: str) -> bool:
+        """
+        以编程方式添加新的场景类型（供外部调用）
+
+        Args:
+            scene_name: 新场景的名称
+
+        Returns:
+            bool: 添加成功返回True，场景已存在或名称为空返回False
+
+        Example:
+            >>> panel = SettingsPanel(root)
+            >>> success = panel.add_scene_type("闯入")
+            >>> if success:
+            ...     print(f"已添加场景: 闯入")
+            ...     panel.set_scene_type("闯入")
+        """
+        scene_name = scene_name.strip()
+
+        if not scene_name or scene_name in self.scene_types:
+            return False
+
+        # 添加到场景列表
+        self.scene_types.append(scene_name)
+
+        # 更新下拉框
+        self.scene_combo["values"] = self.scene_types
+
+        return True
+
+    def update_scene_config(self, config: Dict) -> None:
+        """
+        以编程方式更新场景配置（供外部调用）
+
+        Args:
+            config: 配置字典，可以包含以下任意键：
+                - scene_type: str
+                - light_condition: str ('bright' | 'normal' | 'dim')
+                - enable_roi: bool
+                - enable_sound: bool
+                - enable_email: bool
+                - auto_record: bool
+
+        Example:
+            >>> panel = SettingsPanel(root)
+            >>> panel.update_scene_config({
+            ...     "scene_type": "起火",
+            ...     "light_condition": "bright",
+            ...     "enable_sound": True,
+            ...     "enable_email": True
+            ... })
+        """
+        if "scene_type" in config and config["scene_type"] in self.scene_types:
+            self.scene_type_var.set(config["scene_type"])
+
+        if "light_condition" in config:
+            self.light_condition_var.set(config["light_condition"])
+
+        if "enable_roi" in config:
+            self.enable_roi_var.set(config["enable_roi"])
+
+        if "enable_sound" in config:
+            self.enable_sound_var.set(config["enable_sound"])
+
+        if "enable_email" in config:
+            self.enable_email_var.set(config["enable_email"])
+
+        if "auto_record" in config:
+            self.auto_record_var.set(config["auto_record"])
 
     def _on_window_resize(self, event: tk.Event) -> None:
         """窗口缩放事件处理器，保持窗口宽高比 (3:2)"""
