@@ -37,7 +37,8 @@ class SettingsPanel:
             # 测试模式：创建默认配置
             self.app_config = {
                 "scene": {
-                    "scene_type": "摔倒",
+                    "scene_type": "摔倒",  # 保留用于向后兼容
+                    "selected_scenes": ["摔倒"],  # 新增：用户选择的多个场景
                     "light_condition": "normal",
                     "enable_roi": False,
                     "enable_sound": True,
@@ -49,9 +50,18 @@ class SettingsPanel:
         else:
             # 生产模式：使用主窗口传入的配置
             self.app_config = app_config
+            # 确保存在 selected_scenes 字段（向后兼容）
+            if "selected_scenes" not in self.app_config["scene"]:
+                # 从旧的 scene_type 初始化
+                self.app_config["scene"]["selected_scenes"] = [
+                    self.app_config["scene"]["scene_type"]
+                ]
 
         # 场景类型列表（引用配置中的数据）
         self.scene_types: list[str] = self.app_config["scene_types"]
+
+        # 场景复选框变量字典 {场景名: BooleanVar}
+        self.scene_checkbox_vars: Dict[str, tk.BooleanVar] = {}
 
         # 设置窗口长宽比 (3:2)
         self.aspect_ratio = 3 / 2
@@ -152,34 +162,19 @@ class SettingsPanel:
         # 说明文字
         desc_label = ttk.Label(
             frame,
-            text="配置不同检测场景的参数",
+            text="选择要启用的检测场景（可多选）",
             font=("Arial", 12, "italic"),
             foreground="gray",
         )
         desc_label.pack(anchor="w", pady=(0, 25))
 
-        # 场景选择和新建
-        scene_select_frame = ttk.Frame(frame)
-        scene_select_frame.pack(fill=tk.X, pady=(0, 20))
-
-        ttk.Label(
-            scene_select_frame, text="场景类型:", width=12, font=("Arial", 11)
-        ).pack(side=tk.LEFT)
-        self.scene_type_var = tk.StringVar(value=self.app_config["scene"]["scene_type"])
-        self.scene_combo = ttk.Combobox(
-            scene_select_frame,
-            textvariable=self.scene_type_var,
-            values=self.scene_types,
-            state="readonly",
-            width=18,
-            font=("Arial", 11),
-        )
-        self.scene_combo.pack(side=tk.LEFT, padx=(8, 12))
-        self.scene_combo.bind("<<ComboboxSelected>>", self._on_scene_change)
+        # 场景管理按钮区
+        button_frame = ttk.Frame(frame)
+        button_frame.pack(fill=tk.X, pady=(0, 20))
 
         # 新建场景按钮
         ttk.Button(
-            scene_select_frame,
+            button_frame,
             text="➕ 新建场景",
             command=self._create_new_scene,
             width=13,
@@ -188,15 +183,40 @@ class SettingsPanel:
 
         # 删除场景按钮
         ttk.Button(
-            scene_select_frame,
-            text="删除场景",
-            command=self._delete_current_scene,
+            button_frame,
+            text="🗑️ 删除场景",
+            command=self._delete_selected_scenes,
             width=13,
             padding=5,
         ).pack(side=tk.LEFT)
 
+        # 场景选择区域（可滚动）
+        scene_frame = ttk.LabelFrame(frame, text="场景列表（勾选启用）", padding="18")
+        scene_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 20))
+
+        # 创建滚动条和画布
+        canvas = tk.Canvas(scene_frame, height=150, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(scene_frame, orient="vertical", command=canvas.yview)
+        self.scrollable_frame = ttk.Frame(canvas)
+
+        self.scrollable_frame.bind(
+            "<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+
+        canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # 存储画布和滚动框架的引用
+        self.scene_canvas = canvas
+
+        # 创建场景复选框
+        self._create_scene_checkboxes()
+
         # 场景参数区域
-        params_frame = ttk.LabelFrame(frame, text="场景参数", padding="18")
+        params_frame = ttk.LabelFrame(frame, text="通用场景参数", padding="18")
         params_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 25))
 
         # 光照条件
@@ -288,6 +308,58 @@ class SettingsPanel:
 
         return frame
 
+    def _create_scene_checkboxes(self) -> None:
+        """创建场景复选框列表"""
+        # 清空现有复选框
+        for widget in self.scrollable_frame.winfo_children():
+            widget.destroy()
+
+        self.scene_checkbox_vars.clear()
+
+        # 获取已选中的场景列表
+        selected_scenes = self.app_config["scene"]["selected_scenes"]
+
+        # 为每个场景创建复选框
+        for i, scene in enumerate(self.scene_types):
+            var = tk.BooleanVar(value=scene in selected_scenes)
+            self.scene_checkbox_vars[scene] = var
+
+            checkbox = ttk.Checkbutton(
+                self.scrollable_frame,
+                text=scene,
+                variable=var,
+                command=self._on_scene_checkbox_change,
+                style="TCheckbutton",
+            )
+            checkbox.grid(row=i, column=0, sticky="w", padx=15, pady=8)
+
+        # 如果没有场景，显示提示
+        if not self.scene_types:
+            ttk.Label(
+                self.scrollable_frame,
+                text="暂无场景，请点击'新建场景'添加",
+                foreground="gray",
+                font=("Arial", 11, "italic"),
+            ).grid(row=0, column=0, padx=15, pady=20)
+
+    def _on_scene_checkbox_change(self) -> None:
+        """场景复选框状态改变时的回调"""
+        # 更新选中的场景列表
+        selected = [
+            scene for scene, var in self.scene_checkbox_vars.items() if var.get()
+        ]
+        self.app_config["scene"]["selected_scenes"] = selected
+
+        # 更新 scene_type 为第一个选中的场景（保持向后兼容）
+        if selected:
+            self.app_config["scene"]["scene_type"] = selected[0]
+        else:
+            # 如果没有选中任何场景，保持原值或设为空
+            if self.scene_types:
+                self.app_config["scene"]["scene_type"] = self.scene_types[0]
+
+        print(f"已选中的场景: {selected}")
+
     def show_page(self, page_name: str) -> None:
         """
         显示指定的设置页面
@@ -375,11 +447,8 @@ class SettingsPanel:
             # 添加到场景列表
             self.scene_types.append(scene_name)
 
-            # 更新下拉框
-            self.scene_combo["values"] = self.scene_types
-
-            # 选中新创建的场景
-            self.scene_type_var.set(scene_name)
+            # 重新创建复选框列表
+            self._create_scene_checkboxes()
 
             messagebox.showinfo(
                 "创建成功", f"场景 '{scene_name}' 已成功创建", parent=dialog
@@ -409,35 +478,50 @@ class SettingsPanel:
         # 等待对话框关闭
         dialog.wait_window()
 
-    def _delete_current_scene(self) -> None:
-        """删除当前选中的场景"""
-        current_scene = self.scene_type_var.get()
+    def _delete_selected_scenes(self) -> None:
+        """删除选中的场景"""
+        # 获取当前选中的场景
+        selected_scenes = [
+            scene for scene, var in self.scene_checkbox_vars.items() if var.get()
+        ]
 
-        # 检查是否是内置场景
+        if not selected_scenes:
+            messagebox.showwarning("未选择场景", "请先勾选要删除的场景")
+            return
+
+        # 检查是否包含内置场景
         builtin_scenes = ["摔倒", "起火"]
-        if current_scene in builtin_scenes:
+        builtin_selected = [s for s in selected_scenes if s in builtin_scenes]
+
+        if builtin_selected:
             messagebox.showwarning(
-                "无法删除", f"'{current_scene}' 是内置场景，无法删除"
+                "无法删除",
+                f"以下场景是内置场景，无法删除：\n{', '.join(builtin_selected)}\n\n请取消勾选后再试",
             )
             return
 
         # 确认删除
+        scene_list = "\n".join(f"• {s}" for s in selected_scenes)
         result = messagebox.askyesno(
-            "确认删除", f"确定要删除场景 '{current_scene}' 吗？\n此操作无法撤销。"
+            "确认删除", f"确定要删除以下场景吗？\n\n{scene_list}\n\n此操作无法撤销。"
         )
 
         if result:
-            # 从列表中移除
-            self.scene_types.remove(current_scene)
+            # 从列表中移除选中的场景
+            for scene in selected_scenes:
+                if scene in self.scene_types:
+                    self.scene_types.remove(scene)
 
-            # 更新下拉框
-            self.scene_combo["values"] = self.scene_types
+            # 从已选中列表中移除
+            current_selected = self.app_config["scene"]["selected_scenes"]
+            self.app_config["scene"]["selected_scenes"] = [
+                s for s in current_selected if s not in selected_scenes
+            ]
 
-            # 切换到第一个场景
-            if self.scene_types:
-                self.scene_type_var.set(self.scene_types[0])
+            # 重新创建复选框
+            self._create_scene_checkboxes()
 
-            messagebox.showinfo("删除成功", f"场景 '{current_scene}' 已删除")
+            messagebox.showinfo("删除成功", f"已成功删除 {len(selected_scenes)} 个场景")
 
     def _toggle_roi(self) -> None:
         """切换ROI启用状态"""
@@ -453,22 +537,32 @@ class SettingsPanel:
 
     def _save_scene_config(self) -> None:
         """保存场景配置"""
-        # 更新共享配置
-        self.app_config["scene"]["scene_type"] = self.scene_type_var.get()
+        # 更新选中的场景列表
+        selected = [
+            scene for scene, var in self.scene_checkbox_vars.items() if var.get()
+        ]
+        self.app_config["scene"]["selected_scenes"] = selected
+
+        # 更新 scene_type（保持向后兼容，取第一个选中的场景）
+        if selected:
+            self.app_config["scene"]["scene_type"] = selected[0]
+
+        # 更新其他配置
         self.app_config["scene"]["light_condition"] = self.light_condition_var.get()
         self.app_config["scene"]["enable_roi"] = self.enable_roi_var.get()
         self.app_config["scene"]["enable_sound"] = self.enable_sound_var.get()
         self.app_config["scene"]["enable_email"] = self.enable_email_var.get()
         self.app_config["scene"]["auto_record"] = self.auto_record_var.get()
 
-        messagebox.showinfo("保存成功", "场景配置已保存")
+        scene_info = f"已选场景: {', '.join(selected) if selected else '无'}"
+        messagebox.showinfo("保存成功", f"场景配置已保存\n\n{scene_info}")
         print(f"场景配置已保存到app_config: {self.app_config['scene']}")
 
     # ========== 对外公开接口 ==========
 
     def get_current_scene_type(self) -> str:
         """
-        获取当前选中的场景类型
+        获取当前选中的场景类型（第一个选中的场景，用于向后兼容）
 
         Returns:
             str: 场景类型名称（如 "摔倒"、"起火"等）
@@ -477,8 +571,33 @@ class SettingsPanel:
             >>> panel = SettingsPanel(root)
             >>> scene = panel.get_current_scene_type()
             >>> print(scene)  # "摔倒"
+
+        Note:
+            如果用户选择了多个场景，此方法返回第一个选中的场景。
+            建议使用 get_selected_scenes() 获取所有选中的场景。
         """
-        return self.scene_type_var.get()
+        selected = self.app_config["scene"]["selected_scenes"]
+        if selected:
+            return selected[0]
+        # 如果没有选中任何场景，返回第一个可用场景
+        return self.scene_types[0] if self.scene_types else ""
+
+    def get_selected_scenes(self) -> list[str]:
+        """
+        获取所有选中的场景列表（新接口，推荐使用）
+
+        Returns:
+            list[str]: 用户选中的所有场景类型列表
+
+        Example:
+            >>> panel = SettingsPanel(root)
+            >>> scenes = panel.get_selected_scenes()
+            >>> print(scenes)  # ["摔倒", "起火", "闯入"]
+            >>> for scene in scenes:
+            ...     prompts = get_prompts_for_scene(scene)
+            ...     detect(frame, prompts)
+        """
+        return self.app_config["scene"]["selected_scenes"].copy()
 
     def get_all_scene_types(self) -> list[str]:
         """
@@ -503,23 +622,31 @@ class SettingsPanel:
 
         Dictionary Structure:
             {
-                "scene_type": str,           # 场景类型（如"摔倒"）
-                "light_condition": str,      # 光照条件：'bright' | 'normal' | 'dim'
-                "enable_roi": bool,          # 是否启用ROI
-                "enable_sound": bool,        # 是否启用声音报警
-                "enable_email": bool,        # 是否启用邮件通知
-                "auto_record": bool,         # 是否自动录像
+                "scene_type": str,              # 第一个选中的场景（向后兼容）
+                "selected_scenes": list[str],   # 所有选中的场景列表（新增）
+                "light_condition": str,         # 光照条件：'bright' | 'normal' | 'dim'
+                "enable_roi": bool,             # 是否启用ROI
+                "enable_sound": bool,           # 是否启用声音报警
+                "enable_email": bool,           # 是否启用邮件通知
+                "auto_record": bool,            # 是否自动录像
             }
 
         Example:
             >>> panel = SettingsPanel(root)
             >>> config = panel.get_scene_config()
-            >>> print(config["scene_type"])       # "摔倒"
-            >>> print(config["light_condition"])  # "normal"
-            >>> print(config["enable_roi"])       # False
+            >>> print(config["scene_type"])        # "摔倒"（第一个）
+            >>> print(config["selected_scenes"])   # ["摔倒", "起火"]（所有）
+            >>> print(config["light_condition"])   # "normal"
+            >>> print(config["enable_roi"])        # False
         """
+        selected = self.app_config["scene"]["selected_scenes"]
         return {
-            "scene_type": self.scene_type_var.get(),
+            "scene_type": (
+                selected[0]
+                if selected
+                else (self.scene_types[0] if self.scene_types else "")
+            ),
+            "selected_scenes": selected.copy(),
             "light_condition": self.light_condition_var.get(),
             "enable_roi": self.enable_roi_var.get(),
             "enable_sound": self.enable_sound_var.get(),
@@ -599,7 +726,7 @@ class SettingsPanel:
 
     def set_scene_type(self, scene_type: str) -> bool:
         """
-        以编程方式设置场景类型（供外部调用）
+        以编程方式设置场景类型（供外部调用，向后兼容）
 
         Args:
             scene_type: 场景类型名称
@@ -612,11 +739,58 @@ class SettingsPanel:
             >>> success = panel.set_scene_type("起火")
             >>> if success:
             ...     print("场景切换成功")
+
+        Note:
+            此方法会将选中场景列表设置为只包含指定场景。
+            如需选中多个场景，请使用 set_selected_scenes()。
         """
         if scene_type in self.scene_types:
-            self.scene_type_var.set(scene_type)
+            # 设置为只选中这一个场景
+            self.app_config["scene"]["selected_scenes"] = [scene_type]
+            self.app_config["scene"]["scene_type"] = scene_type
+            # 更新复选框状态
+            if hasattr(self, "scene_checkbox_vars"):
+                for scene, var in self.scene_checkbox_vars.items():
+                    var.set(scene == scene_type)
             return True
         return False
+
+    def set_selected_scenes(self, scene_list: list[str]) -> bool:
+        """
+        以编程方式设置选中的多个场景（新接口）
+
+        Args:
+            scene_list: 场景类型名称列表
+
+        Returns:
+            bool: 设置成功返回True，场景列表为空或包含不存在的场景返回False
+
+        Example:
+            >>> panel = SettingsPanel(root)
+            >>> success = panel.set_selected_scenes(["摔倒", "起火", "闯入"])
+            >>> if success:
+            ...     print("场景选择成功")
+            ...     scenes = panel.get_selected_scenes()
+            ...     print(f"已选场景: {scenes}")
+        """
+        if not scene_list:
+            return False
+
+        # 检查所有场景是否存在
+        for scene in scene_list:
+            if scene not in self.scene_types:
+                return False
+
+        # 更新配置
+        self.app_config["scene"]["selected_scenes"] = scene_list.copy()
+        self.app_config["scene"]["scene_type"] = scene_list[0]
+
+        # 更新复选框状态
+        if hasattr(self, "scene_checkbox_vars"):
+            for scene, var in self.scene_checkbox_vars.items():
+                var.set(scene in scene_list)
+
+        return True
 
     def add_scene_type(self, scene_name: str) -> bool:
         """
@@ -643,8 +817,9 @@ class SettingsPanel:
         # 添加到场景列表
         self.scene_types.append(scene_name)
 
-        # 更新下拉框
-        self.scene_combo["values"] = self.scene_types
+        # 更新复选框列表（如果已创建）
+        if hasattr(self, "scrollable_frame"):
+            self._create_scene_checkboxes()
 
         return True
 
@@ -654,7 +829,8 @@ class SettingsPanel:
 
         Args:
             config: 配置字典，可以包含以下任意键：
-                - scene_type: str
+                - scene_type: str（单个场景，向后兼容）
+                - selected_scenes: list[str]（多个场景，新增）
                 - light_condition: str ('bright' | 'normal' | 'dim')
                 - enable_roi: bool
                 - enable_sound: bool
@@ -663,15 +839,42 @@ class SettingsPanel:
 
         Example:
             >>> panel = SettingsPanel(root)
+            >>> # 方式1：单场景（向后兼容）
             >>> panel.update_scene_config({
             ...     "scene_type": "起火",
             ...     "light_condition": "bright",
-            ...     "enable_sound": True,
+            ...     "enable_sound": True
+            ... })
+            >>>
+            >>> # 方式2：多场景（推荐）
+            >>> panel.update_scene_config({
+            ...     "selected_scenes": ["摔倒", "起火", "闯入"],
+            ...     "light_condition": "normal",
             ...     "enable_email": True
             ... })
         """
-        if "scene_type" in config and config["scene_type"] in self.scene_types:
-            self.scene_type_var.set(config["scene_type"])
+        # 处理多场景选择（优先）
+        if "selected_scenes" in config:
+            scene_list = config["selected_scenes"]
+            if isinstance(scene_list, list) and scene_list:
+                valid_scenes = [s for s in scene_list if s in self.scene_types]
+                if valid_scenes:
+                    self.app_config["scene"]["selected_scenes"] = valid_scenes
+                    self.app_config["scene"]["scene_type"] = valid_scenes[0]
+                    # 更新复选框
+                    if hasattr(self, "scene_checkbox_vars"):
+                        for scene, var in self.scene_checkbox_vars.items():
+                            var.set(scene in valid_scenes)
+
+        # 处理单场景选择（向后兼容）
+        elif "scene_type" in config and config["scene_type"] in self.scene_types:
+            scene = config["scene_type"]
+            self.app_config["scene"]["selected_scenes"] = [scene]
+            self.app_config["scene"]["scene_type"] = scene
+            # 更新复选框
+            if hasattr(self, "scene_checkbox_vars"):
+                for s, var in self.scene_checkbox_vars.items():
+                    var.set(s == scene)
 
         if "light_condition" in config:
             self.light_condition_var.set(config["light_condition"])
