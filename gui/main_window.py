@@ -12,13 +12,19 @@
 # 开发优先级：⭐ (第10-11周完成)
 
 import sys
+import os
+
+# 添加项目根目录到 Python 路径（解决模块导入问题）
+if __name__ == "__main__":
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import tkinter as tk
 from tkinter import ttk, messagebox
 from typing import Dict, Optional
 from PIL import Image, ImageTk
 import cv2
 import numpy as np
-from settings_panel import SettingsPanel
+from gui.settings_panel import SettingsPanel
 
 
 class MainWindow:
@@ -268,13 +274,13 @@ class MainWindow:
     def _ensure_initial_geometry(self) -> None:
         """确保窗口以正确的初始尺寸显示"""
         if not self._resize_state["initialized"]:
-            #字典，定义在__init__方法中
+            # 字典，定义在__init__方法中
             self._resize_state["lock"] = True
 
             # 强制更新几何形状
             center_x = int((self.screen_width - self.target_width) / 2)
             center_y = int((self.screen_height - self.target_height) / 2)
-            #center_x,y在_center_window里面定义
+            # center_x,y在_center_window里面定义
             geometry = f"{self.target_width}x{self.target_height}+{center_x}+{center_y}"
             self.root.geometry(geometry)
             self.root.update_idletasks()

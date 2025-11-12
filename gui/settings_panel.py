@@ -891,6 +891,244 @@ class SettingsPanel:
         if "auto_record" in config:
             self.auto_record_var.set(config["auto_record"])
 
+    # ========== 配置监听接口 ==========
+
+    def get_config_snapshot(self) -> Dict:
+        """
+        获取当前配置的完整快照
+
+        Returns:
+            Dict: 包含所有配置参数的字典快照
+
+        Dictionary Structure:
+            {
+                "scene_type": str,              # 当前场景类型
+                "selected_scenes": list[str],   # 所有选中的场景
+                "confidence_threshold": float,   # 置信度阈值
+                "detection_interval": float,     # 检测间隔
+                "camera_id": int,               # 摄像头ID
+                "alert_delay": float,           # 告警延迟
+                "light_condition": str,         # 光照条件
+                "enable_roi": bool,             # 是否启用ROI
+                "enable_sound": bool,           # 是否启用声音报警
+                "enable_email": bool,           # 是否启用邮件通知
+                "auto_record": bool,            # 是否自动录像
+            }
+
+        Example:
+            >>> panel = SettingsPanel(root)
+            >>> snapshot = panel.get_config_snapshot()
+            >>> print(snapshot["selected_scenes"])  # ["摔倒", "起火"]
+        """
+        selected = self.app_config["scene"]["selected_scenes"]
+        scene_config = self.app_config["scene"]
+
+        return {
+            "scene_type": (
+                selected[0]
+                if selected
+                else (self.scene_types[0] if self.scene_types else "")
+            ),
+            "selected_scenes": selected.copy(),
+            "confidence_threshold": scene_config.get("confidence_threshold"),
+            "detection_interval": scene_config.get("detection_interval"),
+            "camera_id": scene_config.get("camera_id"),
+            "alert_delay": scene_config.get("alert_delay"),
+            "light_condition": self.light_condition_var.get(),
+            "enable_roi": self.enable_roi_var.get(),
+            "enable_sound": self.enable_sound_var.get(),
+            "enable_email": self.enable_email_var.get(),
+            "auto_record": self.auto_record_var.get(),
+        }
+
+    def start_config_monitor(
+        self,
+        callback,
+        interval: int = 500,
+        print_changes: bool = True,
+        print_full_config: bool = True,
+    ) -> None:
+        """
+        启动配置监听器，当配置发生变化时自动调用回调函数
+
+        Args:
+            callback: 回调函数，签名为 callback(old_config: Dict, new_config: Dict)
+            interval: 检查间隔（毫秒），默认500ms
+            print_changes: 是否自动打印配置变化，默认True
+            print_full_config: 是否在变化时打印完整配置，默认True
+
+        Example:
+            >>> def on_config_change(old_config, new_config):
+            ...     print("配置已更新！")
+            ...     # 处理配置变化
+            ...     if old_config["scene_type"] != new_config["scene_type"]:
+            ...         reload_detection_model(new_config["scene_type"])
+            >>>
+            >>> panel = SettingsPanel(root)
+            >>> panel.start_config_monitor(on_config_change)
+            >>> # 现在配置变化时会自动调用 on_config_change
+
+        Note:
+            - 监听器会在后台持续运行，直到窗口关闭
+            - 回调函数会在Tkinter主线程中执行
+            - 如果回调函数抛出异常，监听器会继续运行
+        """
+        # 保存初始配置
+        self._last_config = self.get_config_snapshot()
+        self._monitor_callback = callback
+        self._monitor_interval = interval
+        self._monitor_print_changes = print_changes
+        self._monitor_print_full_config = print_full_config
+
+        # 启动监听
+        self._check_config_changes()
+
+    def _check_config_changes(self) -> None:
+        """内部方法：定期检查配置变化"""
+        try:
+            current_config = self.get_config_snapshot()
+
+            # 检查是否有变化
+            if current_config != self._last_config:
+                # 打印变化信息（如果启用）
+                if self._monitor_print_changes:
+                    self._print_config_diff(self._last_config, current_config)
+
+                # 打印完整配置（如果启用）
+                if self._monitor_print_full_config:
+                    self._print_config()
+
+                # 调用用户回调
+                try:
+                    self._monitor_callback(self._last_config, current_config)
+                except Exception as e:
+                    print(f"❌ 配置监听回调函数出错: {e}")
+
+                # 更新上次配置
+                self._last_config = current_config.copy()
+
+            # 继续监听
+            self.parent.after(self._monitor_interval, self._check_config_changes)
+        except Exception as e:
+            print(f"❌ 配置监听出错: {e}")
+            # 即使出错也继续监听
+            self.parent.after(self._monitor_interval, self._check_config_changes)
+
+    def _print_config_diff(self, old_config: Dict, new_config: Dict) -> None:
+        """内部方法：打印配置变化的详细信息"""
+        print("\n" + "🔄" * 30)
+        print("检测到配置变化！")
+        print("🔄" * 30)
+
+        changes = []
+
+        # 检查场景类型变化
+        if old_config.get("scene_type") != new_config.get("scene_type"):
+            changes.append(
+                f"🎯 场景类型: {old_config.get('scene_type')} → {new_config.get('scene_type')}"
+            )
+
+        # 检查选中场景列表变化
+        old_scenes = set(old_config.get("selected_scenes", []))
+        new_scenes = set(new_config.get("selected_scenes", []))
+        if old_scenes != new_scenes:
+            added = new_scenes - old_scenes
+            removed = old_scenes - new_scenes
+            if added:
+                changes.append(f"📌 新增场景: {', '.join(added)}")
+            if removed:
+                changes.append(f"📌 移除场景: {', '.join(removed)}")
+            if not added and not removed:
+                changes.append(f"📌 场景顺序已改变")
+
+        # 检查其他参数变化
+        param_names = {
+            "confidence_threshold": "置信度阈值",
+            "detection_interval": "检测间隔",
+            "camera_id": "摄像头ID",
+            "alert_delay": "告警延迟",
+            "light_condition": "光照条件",
+            "enable_roi": "启用ROI",
+            "enable_sound": "声音报警",
+            "enable_email": "邮件通知",
+            "auto_record": "自动录像",
+        }
+
+        for key, name in param_names.items():
+            old_val = old_config.get(key)
+            new_val = new_config.get(key)
+            if old_val != new_val:
+                # 布尔值转换为中文
+                if isinstance(old_val, bool):
+                    old_val = "是" if old_val else "否"
+                    new_val = "是" if new_val else "否"
+                changes.append(f"⚙️  {name}: {old_val} → {new_val}")
+
+        # 打印所有变化
+        if changes:
+            for change in changes:
+                print(f"  {change}")
+        else:
+            print("  (未检测到具体变化，可能是内部状态更新)")
+
+        print("🔄" * 30 + "\n")
+
+    def _print_config(self) -> None:
+        """内部方法：打印完整的配置信息"""
+        print("\n" + "=" * 60)
+        print("📋 当前配置信息:")
+        print("=" * 60)
+
+        # 场景配置
+        selected = self.app_config["scene"]["selected_scenes"]
+        print(f"🎯 当前场景类型: {selected[0] if selected else '无'}")
+        print(f"📌 所有选中场景: {', '.join(selected) if selected else '无'}")
+
+        # 其他配置信息
+        scene_config = self.app_config["scene"]
+        print(f"\n⚙️  配置参数:")
+        print(f"   • 置信度阈值: {scene_config.get('confidence_threshold', 'N/A')}")
+        print(f"   • 检测间隔: {scene_config.get('detection_interval', 'N/A')} 秒")
+        print(f"   • 摄像头ID: {scene_config.get('camera_id', 'N/A')}")
+        print(f"   • 告警延迟: {scene_config.get('alert_delay', 'N/A')} 秒")
+
+        # 场景参数
+        print(f"\n🎨 场景参数:")
+        print(f"   • 光照条件: {scene_config.get('light_condition', 'N/A')}")
+        print(f"   • 启用ROI: {'是' if scene_config.get('enable_roi') else '否'}")
+        print(f"   • 声音报警: {'是' if scene_config.get('enable_sound') else '否'}")
+        print(f"   • 邮件通知: {'是' if scene_config.get('enable_email') else '否'}")
+        print(f"   • 自动录像: {'是' if scene_config.get('auto_record') else '否'}")
+        print("=" * 60 + "\n")
+
+    def print_current_config(self) -> None:
+        """
+        手动打印当前配置信息（公共接口）
+
+        Example:
+            >>> panel = SettingsPanel(root)
+            >>> panel.print_current_config()
+            📋 当前配置信息:
+            🎯 当前场景类型: 摔倒
+            ...
+        """
+        self._print_config()
+
+    def stop_config_monitor(self) -> None:
+        """
+        停止配置监听器
+
+        Example:
+            >>> panel = SettingsPanel(root)
+            >>> panel.start_config_monitor(callback)
+            >>> # ... 一段时间后 ...
+            >>> panel.stop_config_monitor()  # 停止监听
+        """
+        # 通过设置一个标志来停止监听
+        if hasattr(self, "_monitor_callback"):
+            self._monitor_callback = None
+            print("✅ 配置监听器已停止")
+
     def _on_window_resize(self, event: tk.Event) -> None:
         """窗口缩放事件处理器，保持窗口宽高比 (3:2)"""
         if event.widget is not self.parent or self._resize_state["lock"]:
