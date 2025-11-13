@@ -710,22 +710,91 @@ config = panel.app_config["scene"]
 
 ---
 
-## 完整 API 速查表
+## 配置监听接口 ✨ 新增
 
-| 方法 | 类型 | 功能 |
-|------|------|------|
-| `get_scene_config()` | 读取 | 获取完整场景配置 ⭐ |
-| `get_current_scene_type()` | 读取 | 获取当前场景类型 |
-| `get_all_scene_types()` | 读取 | 获取所有场景类型列表 |
-| `get_light_condition()` | 读取 | 获取光照条件 |
-| `get_roi_settings()` | 读取 | 获取ROI设置 |
-| `get_alert_settings()` | 读取 | 获取报警设置 |
-| `set_scene_type(name)` | 修改 | 切换场景类型 |
-| `update_scene_config(dict)` | 修改 | 批量更新配置 ⭐ |
-| `add_scene_type(name)` | 管理 | 添加新场景类型 |
+### 概述
+
+配置监听功能允许你实时监控用户的配置变化，并在变化发生时自动执行相应操作。
+
+### API 列表
+
+| 方法 | 功能 |
+|------|------|
+| `start_config_monitor()` | 启动配置监听器 |
+| `stop_config_monitor()` | 停止配置监听器 |
+| `get_config_snapshot()` | 获取配置快照 |
+| `print_current_config()` | 打印当前配置 |
+
+### 使用示例
+
+```python
+from gui.main_window import MainWindow
+
+gui = MainWindow()
+
+# 定义回调函数
+def on_config_change(old_config, new_config):
+    if old_config["scene_type"] != new_config["scene_type"]:
+        print(f"场景已切换: {new_config['scene_type']}")
+        # 重新加载模型...
+
+# 启动监听
+gui.settings_panel.start_config_monitor(
+    callback=on_config_change,
+    interval=500,              # 每500ms检查一次
+    print_changes=True,        # 自动打印变化
+    print_full_config=True     # 打印完整配置
+)
+
+gui.run()
+```
+
+### 详细文档
+
+完整的配置监听API文档请参阅：[配置监听接口文档](CONFIG_MONITOR_API.md)
 
 ---
 
-**文档版本:** v1.0  
+## 完整 API 速查表
+
+### 读取接口（7个）
+| 方法 | 功能 |
+|------|------|
+| `get_scene_config()` | 获取完整场景配置 ⭐ |
+| `get_current_scene_type()` | 获取当前场景类型 |
+| `get_selected_scenes()` | 获取所有选中的场景 ✨ |
+| `get_all_scene_types()` | 获取所有场景类型列表 |
+| `get_light_condition()` | 获取光照条件 |
+| `get_roi_settings()` | 获取ROI设置 |
+| `get_alert_settings()` | 获取报警设置 |
+
+### 写入接口（4个）
+| 方法 | 功能 |
+|------|------|
+| `set_scene_type(name)` | 切换场景类型 |
+| `set_selected_scenes(list)` | 设置多个选中场景 ✨ |
+| `update_scene_config(dict)` | 批量更新配置 ⭐ |
+| `add_scene_type(name)` | 添加新场景类型 |
+
+### 配置监听接口（4个）✨ 新增
+| 方法 | 功能 |
+|------|------|
+| `start_config_monitor()` | 启动配置监听器 |
+| `stop_config_monitor()` | 停止配置监听器 |
+| `get_config_snapshot()` | 获取配置快照 |
+| `print_current_config()` | 打印当前配置 |
+
+---
+
+## 相关文档
+
+- [配置监听接口文档](CONFIG_MONITOR_API.md) ✨ 新增
+- [多场景选择指南](MULTI_SCENE_GUIDE.md)
+- [用户输入接口文档](USER_INPUT_INTERFACE.md)
+- [快速参考](QUICK_REFERENCE.md)
+
+---
+
+**文档版本:** v2.0  
 **作者:** LXR（李修然）  
-**最后更新:** 2025年11月11日
+**最后更新:** 2025年11月12日

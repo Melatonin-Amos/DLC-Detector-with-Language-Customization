@@ -793,16 +793,7 @@ class SettingsPanel:
 #### 1️⃣ 读取配置示例
 
 ```python
-from gui.main_window import MainWindow
 
-# 创建主窗口
-gui = MainWindow()
-
-# 方式1：获取完整配置（推荐）
-config = gui.settings_panel.get_scene_config()
-print(f"当前场景: {config['scene_type']}")
-print(f"选中场景: {config['selected_scenes']}")  # 新增：支持多场景
-print(f"光照条件: {config['light_condition']}")
 
 # 方式2：只获取特定信息
 scene = gui.settings_panel.get_current_scene_type()
