@@ -753,6 +753,199 @@ class SettingsPanel:
 | `_delete_current_scene()` | 删除当前选中的场景 |
 | `_save_scene_config()` | 保存场景配置到 app_config |
 
+
+## 获取用户配置信息，你需要的接口！！！！！
+
+### 📋 读取接口（7个）
+
+| 方法 | 类型 | 功能 |
+|------|------|------|
+| `get_scene_config()` | 读取 | 获取完整场景配置 ⭐ |
+| `get_current_scene_type()` | 读取 | 获取当前场景类型 |
+| `get_selected_scenes()` | 读取 | 获取所有选中的场景 ✨ 新增 |
+| `get_all_scene_types()` | 读取 | 获取所有场景类型列表 |
+| `get_light_condition()` | 读取 | 获取光照条件 |
+| `get_roi_settings()` | 读取 | 获取ROI设置 |
+| `get_alert_settings()` | 读取 | 获取报警设置 |
+
+### ✏️ 写入接口（4个）
+
+| 方法 | 类型 | 功能 |
+|------|------|------|
+| `set_scene_type(name)` | 修改 | 切换场景类型 |
+| `set_selected_scenes(list)` | 修改 | 设置多个选中场景 ✨ 新增 |
+| `update_scene_config(dict)` | 修改 | 批量更新配置 ⭐ |
+| `add_scene_type(name)` | 管理 | 添加新场景类型 |
+
+### 🔔 配置监听接口（4个）✨ 新增
+
+| 方法 | 类型 | 功能 |
+|------|------|------|
+| `start_config_monitor(callback, ...)` | 监听 | 启动配置监听器 ⭐ |
+| `stop_config_monitor()` | 监听 | 停止配置监听器 |
+| `get_config_snapshot()` | 监听 | 获取配置快照 |
+| `print_current_config()` | 监听 | 打印当前配置 |
+
+---
+
+### 🚀 接口使用示例
+
+#### 1️⃣ 读取配置示例
+
+```python
+
+
+# 方式2：只获取特定信息
+scene = gui.settings_panel.get_current_scene_type()
+scenes = gui.settings_panel.get_selected_scenes()  # 新增：获取所有选中场景
+alerts = gui.settings_panel.get_alert_settings()
+
+print(f"当前检测场景: {scene}")
+print(f"所有选中场景: {scenes}")
+print(f"声音报警: {alerts['sound']}")
+print(f"邮件通知: {alerts['email']}")
+```
+
+#### 2️⃣ 修改配置示例
+
+```python
+# 方式1：切换单个场景（向后兼容）
+gui.settings_panel.set_scene_type("起火")
+
+# 方式2：设置多个场景（新增）✨
+gui.settings_panel.set_selected_scenes(["摔倒", "起火", "闯入"])
+
+# 方式3：批量更新配置（推荐）
+gui.settings_panel.update_scene_config({
+    "selected_scenes": ["摔倒", "起火"],  # 多场景选择
+    "light_condition": "bright",
+    "enable_sound": True,
+    "enable_email": True
+})
+
+# 方式4：添加自定义场景
+success = gui.settings_panel.add_scene_type("烟雾检测")
+if success:
+    print("场景添加成功")
+```
+
+#### 3️⃣ 配置监听示例 ✨ 新增
+
+```python
+from gui.main_window import MainWindow
+
+gui = MainWindow()
+
+# 定义配置变化回调函数
+def on_config_change(old_config, new_config):
+    """当用户在GUI中修改配置时自动调用"""
+    
+    # 检测场景是否变化
+    if old_config["scene_type"] != new_config["scene_type"]:
+        print(f"场景已切换: {new_config['scene_type']}")
+        # 重新加载检测模型...
+    
+    # 检测多场景选择变化
+    old_scenes = set(old_config["selected_scenes"])
+    new_scenes = set(new_config["selected_scenes"])
+    if old_scenes != new_scenes:
+        print(f"场景列表更新: {new_scenes}")
+        # 为每个场景加载提示词...
+    
+    # 检测摄像头变化
+    if old_config.get("camera_id") != new_config.get("camera_id"):
+        print(f"摄像头切换: {new_config['camera_id']}")
+        # 重启视频流...
+
+# 启动配置监听
+gui.settings_panel.start_config_monitor(
+    callback=on_config_change,
+    interval=500,              # 每500ms检查一次
+    print_changes=True,        # 自动打印配置变化
+    print_full_config=True     # 变化时打印完整配置
+)
+
+# 启动GUI
+gui.run()
+```
+
+**监听器输出示例**：
+```
+🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄
+检测到配置变化！
+🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄
+  📌 新增场景: 闯入
+  ⚙️  声音报警: 否 → 是
+  ⚙️  光照条件: normal → bright
+🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄🔄
+
+============================================================
+📋 当前配置信息:
+============================================================
+🎯 当前场景类型: 摔倒
+📌 所有选中场景: 摔倒, 起火, 闯入
+
+⚙️  配置参数:
+   • 置信度阈值: 0.5
+   • 检测间隔: 1.0 秒
+   • 摄像头ID: 0
+   • 告警延迟: 2.0 秒
+
+🎨 场景参数:
+   • 光照条件: bright
+   • 启用ROI: 否
+   • 声音报警: 是
+   • 邮件通知: 否
+   • 自动录像: 否
+============================================================
+```
+
+#### 4️⃣ 与检测模块集成示例
+
+```python
+from gui.main_window import MainWindow
+from src.core.clip_detector import CLIPDetector
+
+gui = MainWindow()
+detector = CLIPDetector(model_name="openai/clip-vit-base-patch32")
+
+def on_config_change(old_config, new_config):
+    """配置变化时自动更新检测器"""
+    
+    # 1. 场景切换：重新加载模型
+    if old_config["scene_type"] != new_config["scene_type"]:
+        scene = new_config["scene_type"]
+        detector.load_scene_config(scene)
+    
+    # 2. 多场景选择：加载所有场景的提示词
+    if old_config["selected_scenes"] != new_config["selected_scenes"]:
+        all_prompts = []
+        for scene in new_config["selected_scenes"]:
+            prompts = load_prompts_for_scene(scene)
+            all_prompts.extend(prompts)
+        detector.set_prompts(all_prompts)
+    
+    # 3. 光照条件：调整检测阈值
+    if old_config["light_condition"] != new_config["light_condition"]:
+        threshold = get_threshold_for_light(new_config["light_condition"])
+        detector.set_threshold(threshold)
+
+# 启动监听
+gui.settings_panel.start_config_monitor(on_config_change)
+
+# 启动GUI
+gui.run()
+```
+
+---
+
+### 📚 详细文档
+
+- **配置监听完整API**: [gui/CONFIG_MONITOR_API.md](gui/CONFIG_MONITOR_API.md) ✨
+- **SettingsPanel 接口总览**: [gui/SETTINGS_PANEL_API.md](gui/SETTINGS_PANEL_API.md)
+- **多场景选择指南**: [gui/MULTI_SCENE_GUIDE.md](gui/MULTI_SCENE_GUIDE.md) ✨
+- **用户输入接口文档**: [gui/USER_INPUT_INTERFACE.md](gui/USER_INPUT_INTERFACE.md)
+
 ---
 
 ### 5. 使用指南
@@ -951,7 +1144,7 @@ def _set_roi_area(self):
 
 ---
 
-**GUI模块开发者**: LXR（李修然）  
+**GUI模块开发者**: LXR
 **最后更新**: 2025年11月9日
 
 

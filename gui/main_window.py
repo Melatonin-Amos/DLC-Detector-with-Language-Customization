@@ -12,13 +12,19 @@
 # 开发优先级：⭐ (第10-11周完成)
 
 import sys
+import os
+
+# 添加项目根目录到 Python 路径（解决模块导入问题）
+if __name__ == "__main__":
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import tkinter as tk
 from tkinter import ttk, messagebox
 from typing import Dict, Optional
 from PIL import Image, ImageTk
 import cv2
 import numpy as np
-from settings_panel import SettingsPanel
+from gui.settings_panel import SettingsPanel
 
 
 class MainWindow:
@@ -115,12 +121,19 @@ class MainWindow:
     def _setup_icon(self) -> None:
         """设置窗口图标"""
         try:
-            icon = Image.open("gui/kawaii_icon.png")
+            # 获取图标的绝对路径
+            icon_path = os.path.join(os.path.dirname(__file__), "kawaii_icon.png")
+            icon = Image.open(icon_path)
+            # 调整图标大小为合适的尺寸（Tkinter 建议使用较小的图标）
+            icon = icon.resize((64, 64), Image.Resampling.LANCZOS)
             photo = ImageTk.PhotoImage(icon)
             # 把图片转换成Tkinter能用的格式
             self.root.wm_iconphoto(True, photo)
+            # 保存引用防止被垃圾回收
+            self._icon_photo = photo
         except Exception as e:
-            print(f"无法加载图标: {e}")
+            print(f"⚠️  图标加载失败（不影响功能）: {e}")
+            # 图标加载失败不影响程序运行，只是窗口使用默认图标
             # try：尝试执行里面的代码，如果出错不会报错直接终止程序     except Exception as e:：捕获任意异常，并把异常对象赋值给 e
             # self.root.wm_iconphoto(True, photo)   第一个参数 True：表示同时设置 主窗口和任务栏图标    第二个参数 photo：要设置的图标对象
 
@@ -268,13 +281,13 @@ class MainWindow:
     def _ensure_initial_geometry(self) -> None:
         """确保窗口以正确的初始尺寸显示"""
         if not self._resize_state["initialized"]:
-            #字典，定义在__init__方法中
+            # 字典，定义在__init__方法中
             self._resize_state["lock"] = True
 
             # 强制更新几何形状
             center_x = int((self.screen_width - self.target_width) / 2)
             center_y = int((self.screen_height - self.target_height) / 2)
-            #center_x,y在_center_window里面定义
+            # center_x,y在_center_window里面定义
             geometry = f"{self.target_width}x{self.target_height}+{center_x}+{center_y}"
             self.root.geometry(geometry)
             self.root.update_idletasks()
@@ -410,11 +423,17 @@ class MainWindow:
 
         # 设置窗口图标（如果有的话）
         try:
-            icon = Image.open("gui/kawaii_icon.png")
+            # 获取图标的绝对路径
+            icon_path = os.path.join(os.path.dirname(__file__), "kawaii_icon.png")
+            icon = Image.open(icon_path)
+            # 调整图标大小
+            icon = icon.resize((64, 64), Image.Resampling.LANCZOS)
             photo = ImageTk.PhotoImage(icon)
             self.settings_window.wm_iconphoto(True, photo)
+            # 保存引用防止被垃圾回收
+            self._settings_icon_photo = photo
         except Exception as e:
-            print(f"无法加载设置窗口图标: {e}")
+            print(f"⚠️  设置窗口图标加载失败（不影响功能）: {e}")
 
         # 创建设置面板，传递配置数据
         self.settings_panel = SettingsPanel(self.settings_window, self.app_config)
