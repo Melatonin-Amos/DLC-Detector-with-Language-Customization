@@ -11,7 +11,7 @@
 # 开发优先级：⭐ (第10-11周完成)
 
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, font
 from typing import Dict, Optional, Union
 
 
@@ -29,6 +29,10 @@ class SettingsPanel:
             app_config: 应用程序配置字典（从主窗口传入，用于持久化配置）
         """
         self.parent = parent
+
+        # 设置全局字体
+        system_font = font.nametofont("TkDefaultFont")
+        self.parent.option_add("*Font", system_font)
         self.current_page: Optional[str] = None
         self.content_frames: Dict[str, ttk.Frame] = {}
 

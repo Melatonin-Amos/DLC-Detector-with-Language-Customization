@@ -19,7 +19,7 @@ if __name__ == "__main__":
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, font
 from typing import Dict, Optional
 from PIL import Image, ImageTk
 import cv2
@@ -40,7 +40,9 @@ class MainWindow:
         # 创建主窗口
         self.root = tk.Tk()
         self.root.title("主窗口 - 实时视频")
-
+        # 系统默认字体
+        system_font = font.nametofont("TkDefaultFont")
+        self.root.option_add("*Font", system_font)
         # 获取屏幕尺寸
         self.screen_width = self.root.winfo_screenwidth()
         self.screen_height = self.root.winfo_screenheight()
