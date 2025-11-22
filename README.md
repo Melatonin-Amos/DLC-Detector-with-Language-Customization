@@ -576,26 +576,23 @@ GUI（图形用户界面）模块为DLC检测系统提供了直观易用的可�
 - ✅ 实时视频流预览（本地摄像头）
 - ✅ 视频播放控制（开始/暂停/停止）
 - ✅ 场景配置面板
-- ✅ 自适应窗口布局（保持宽高比）
-- ✅ 高帧率视频显示（60fps）
+- ✅ 视频显示（60fps）
 
 **功能特性**：
 - 📹 **视频预览**：实时显示本地摄像头画面，支持自动缩放和居中显示
 - 🎬 **场景管理**：支持自定义场景类型（如"摔倒"、"起火"等）
-- ⚙️ **参数配置**：可配置光照条件、检测区域（ROI）、报警方式等
-- 🎨 **友好界面**：采用ttk主题样式，界面简洁美观
 
 #### 1.2 模块结构
 
 ```
 gui/
-├── __init__.py              # 包初始化文件
+├── __init__.py 
+|── kawaii_icon.png         # 窗口图标             # 包初始化文件
 ├── main_window.py           # 主窗口（视频显示和控制）
 ├── settings_panel.py        # 设置面板（场景配置）
-├── CAMERA_FLOW.md          # 摄像头视频流实现文档
-└── kawaii_icon.png         # 窗口图标
-```
+|—— lxrtest.py                  #lxr自己测试接口的文件/没啥用
 
+```
 ---
 
 ### 2. 主窗口功能说明
@@ -638,10 +635,9 @@ Canvas显示(60fps, 17ms/帧)
 - **自适应缩放**：窗口大小改变时自动调整视频显示区域
 - **保持宽高比**：主窗口始终保持16:9的宽高比
 - **居中显示**：视频画面在画布中居中显示，多余区域填充黑色
-- **高性能**：60fps刷新率，延迟仅17ms
+- **高性能**：60fps刷新率
 
 ---
-
 ### 3. 设置面板功能说明
 
 #### 3.1 面板布局
@@ -656,21 +652,19 @@ Canvas显示(60fps, 17ms/帧)
 - 内置场景：`摔倒`、`起火`
 - 支持自定义新场景
 - 支持删除自定义场景（内置场景不可删除）
+- 支持多选检测场景
 
 **场景参数配置**：
 
 | 参数类别 | 配置项 | 说明 |
 |---------|--------|------|
-| **场景类型** | 下拉选择框 | 选择当前要配置的场景 |
-| **光照条件** | 明亮/正常/昏暗 | 单选框，影响检测算法的参数 |
-| **检测区域** | 启用ROI | 复选框，是否启用感兴趣区域检测 |
-| **报警设置** | 声音报警/邮件通知 | 复选框，配置警报方式 |
+| **场景类型** | 复选框 | 选择当前要配置的场景 |
+| **报警设置** | 声音报警/短信通知 | 复选框，配置警报方式 |
 | **录像设置** | 事件触发时自动录像 | 复选框，是否在检测到事件时录像 |
 
 **操作按钮**：
 - `➕ 新建场景`：弹出对话框输入新场景名称
 - `删除场景`：删除当前选中的自定义场景
-- `设置ROI区域`：打开ROI区域选择界面（待实现）
 - `保存场景配置`：保存当前配置到内存
 
 #### 3.3 配置持久化
@@ -681,10 +675,8 @@ Canvas显示(60fps, 17ms/帧)
 app_config = {
     "scene": {
         "scene_type": "摔倒",           # 当前场景类型
-        "light_condition": "normal",    # 光照条件
-        "enable_roi": False,            # 是否启用ROI
         "enable_sound": True,           # 声音报警
-        "enable_email": False,          # 邮件通知
+        "enable_email": False,          # 短信通知
         "auto_record": False,           # 自动录像
     },
     "scene_types": ["摔倒", "起火"],   # 场景类型列表
@@ -762,10 +754,8 @@ class SettingsPanel:
 |------|------|------|
 | `get_scene_config()` | 读取 | 获取完整场景配置 ⭐ |
 | `get_current_scene_type()` | 读取 | 获取当前场景类型 |
-| `get_selected_scenes()` | 读取 | 获取所有选中的场景 ✨ 新增 |
+| `get_selected_scenes()` | 读取 | 获取所有选中的场景 ✨ |
 | `get_all_scene_types()` | 读取 | 获取所有场景类型列表 |
-| `get_light_condition()` | 读取 | 获取光照条件 |
-| `get_roi_settings()` | 读取 | 获取ROI设置 |
 | `get_alert_settings()` | 读取 | 获取报警设置 |
 
 ### ✏️ 写入接口（4个）
@@ -777,7 +767,7 @@ class SettingsPanel:
 | `update_scene_config(dict)` | 修改 | 批量更新配置 ⭐ |
 | `add_scene_type(name)` | 管理 | 添加新场景类型 |
 
-### 🔔 配置监听接口（4个）✨ 新增
+### 🔔 配置监听接口（4个）
 
 | 方法 | 类型 | 功能 |
 |------|------|------|
@@ -829,7 +819,7 @@ if success:
     print("场景添加成功")
 ```
 
-#### 3️⃣ 配置监听示例 ✨ 新增
+#### 3️⃣ 配置监听示例 
 
 ```python
 from gui.main_window import MainWindow
@@ -892,131 +882,31 @@ gui.run()
    • 告警延迟: 2.0 秒
 
 🎨 场景参数:
-   • 光照条件: bright
-   • 启用ROI: 否
    • 声音报警: 是
    • 邮件通知: 否
    • 自动录像: 否
 ============================================================
 ```
 
-#### 4️⃣ 与检测模块集成示例
 
-```python
-from gui.main_window import MainWindow
-from src.core.clip_detector import CLIPDetector
 
-gui = MainWindow()
-detector = CLIPDetector(model_name="openai/clip-vit-base-patch32")
+### 5. 技术细节
 
-def on_config_change(old_config, new_config):
-    """配置变化时自动更新检测器"""
-    
-    # 1. 场景切换：重新加载模型
-    if old_config["scene_type"] != new_config["scene_type"]:
-        scene = new_config["scene_type"]
-        detector.load_scene_config(scene)
-    
-    # 2. 多场景选择：加载所有场景的提示词
-    if old_config["selected_scenes"] != new_config["selected_scenes"]:
-        all_prompts = []
-        for scene in new_config["selected_scenes"]:
-            prompts = load_prompts_for_scene(scene)
-            all_prompts.extend(prompts)
-        detector.set_prompts(all_prompts)
-    
-    # 3. 光照条件：调整检测阈值
-    if old_config["light_condition"] != new_config["light_condition"]:
-        threshold = get_threshold_for_light(new_config["light_condition"])
-        detector.set_threshold(threshold)
-
-# 启动监听
-gui.settings_panel.start_config_monitor(on_config_change)
-
-# 启动GUI
-gui.run()
-```
-
----
-
-### 📚 详细文档
-
-- **配置监听完整API**: [gui/CONFIG_MONITOR_API.md](gui/CONFIG_MONITOR_API.md) ✨
-- **SettingsPanel 接口总览**: [gui/SETTINGS_PANEL_API.md](gui/SETTINGS_PANEL_API.md)
-- **多场景选择指南**: [gui/MULTI_SCENE_GUIDE.md](gui/MULTI_SCENE_GUIDE.md) ✨
-- **用户输入接口文档**: [gui/USER_INPUT_INTERFACE.md](gui/USER_INPUT_INTERFACE.md)
-
----
-
-### 5. 使用指南
-
-#### 5.1 启动GUI
-
-**方法一：直接运行主窗口**
-```bash
-cd /path/to/DLC-Detector-with-Language-Customization
-python gui/main_window.py
-```
-
-**方法二：独立测试设置面板**
-```bash
-python gui/settings_panel.py
-```
-
-#### 5.2 基本操作流程
-
-1. **启动应用**
-   ```bash
-   python gui/main_window.py
-   ```
-
-2. **开始检测**
-   - 点击 `▶ 开始检测` 按钮
-   - 系统自动打开默认摄像头（设备ID=0）
-   - 视频画面开始实时显示
-
-3. **配置场景**
-   - 点击 `⚙ 设置` 按钮打开设置面板
-   - 在场景配置页面选择或新建场景
-   - 配置场景参数（光照、ROI、报警等）
-   - 点击 `保存场景配置` 保存设置
-
-4. **控制播放**
-   - `⏸ 暂停`：暂停视频显示
-   - 再次点击 `⏸ 暂停`：恢复播放
-   - `⏹ 停止`：停止视频流并释放摄像头
-
-#### 5.3 自定义场景示例
-
-假设要添加"闯入检测"场景：
-
-1. 点击 `⚙ 设置` 打开设置面板
-2. 点击 `➕ 新建场景` 按钮
-3. 在对话框中输入 "闯入"
-4. 点击 `✓ 确定`
-5. 在场景类型下拉框中选择 "闯入"
-6. 配置该场景的参数
-7. 点击 `保存场景配置`
-
----
-
-### 6. 技术细节
-
-#### 6.1 视频帧率优化
+#### 5.1 视频帧率优化
 
 - **目标帧率**：60fps
 - **刷新间隔**：17ms (1000ms / 60fps ≈ 17ms)
 - **实现方式**：`root.after(17, self._update_video_frame)`
 - **缓冲设置**：`CAP_PROP_BUFFERSIZE = 1`（减少延迟）
 
-#### 6.2 颜色空间转换
+#### 5.2 颜色空间转换
 
 OpenCV默认使用BGR格式，而PIL/Tkinter使用RGB格式：
 ```python
 frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 ```
 
-#### 6.3 图像格式转换链
+#### 5.3 图像格式转换链
 
 ```
 numpy.ndarray (OpenCV BGR)
@@ -1030,14 +920,14 @@ ImageTk.PhotoImage
 显示在Canvas上
 ```
 
-#### 6.4 内存管理
+#### 5.4 内存管理
 
 必须保持PhotoImage的引用，否则会被Python垃圾回收：
 ```python
 self.video_canvas.image = photo  # 保持引用
 ```
 
-#### 6.5 窗口缩放机制
+#### 5.5 窗口缩放机制
 
 - 主窗口保持16:9宽高比
 - 设置面板保持3:2宽高比
@@ -1046,9 +936,9 @@ self.video_canvas.image = photo  # 保持引用
 
 ---
 
-### 7. 扩展开发建议
+### 6. 扩展开发建议
 
-#### 7.1 与检测模块集成
+#### 6.1 与检测模块集成
 
 在 `_update_video_frame()` 方法中添加检测调用：
 
@@ -1076,76 +966,15 @@ def _update_video_frame(self) -> None:
             # 继续显示逻辑...
 ```
 
-#### 7.2 添加检测结果显示
+#### 6.2 添加检测结果弹窗（待实现）
 
-可以在视频画布上叠加检测结果：
 
-```python
-def _draw_detection_overlay(self, canvas, results):
-    """在画布上绘制检测结果"""
-    # 在画布顶部显示检测到的场景
-    canvas.create_text(
-        10, 10,
-        text=f"检测结果: {results}",
-        anchor="nw",
-        fill="red",
-        font=("Arial", 14, "bold")
-    )
-```
-
-#### 7.3 实现ROI选择功能
-
-`_set_roi_area()` 方法当前为占位符，可以实现为：
-
-```python
-def _set_roi_area(self):
-    """打开ROI选择窗口"""
-    roi_window = tk.Toplevel(self.parent)
-    roi_window.title("选择检测区域")
-    
-    # 显示当前视频帧
-    # 允许用户用鼠标框选区域
-    # 保存ROI坐标到配置
-```
 
 ---
 
-### 8. 常见问题
-
-#### Q1: 摄像头无法打开？
-**A**: 检查以下几点：
-- macOS需要授予终端/Python摄像头访问权限
-- 确认设备ID是否正确（默认为0）
-- 检查是否有其他程序占用摄像头
-
-#### Q2: 视频显示卡顿？
-**A**: 可能原因：
-- CPU性能不足以支持60fps
-- 摄像头硬件不支持60fps
-- 可以在代码中将17ms改为33ms（30fps）降低性能要求
-
-#### Q3: 窗口大小调整后视频变形？
-**A**: 这不应该发生，窗口已经实现了宽高比锁定。如果出现此问题，请检查：
-- `_on_window_resize()` 方法是否正常工作
-- `aspect_ratio` 是否设置正确
-
-#### Q4: 设置无法保存？
-**A**: 当前配置仅保存在内存中（`app_config`字典），关闭窗口后会丢失。未来可以实现：
-- 将配置保存到JSON文件
-- 在启动时加载配置文件
-
----
-
-### 9. 相关文档
-
-- [摄像头视频流实现文档](gui/CAMERA_FLOW.md) - 详细的技术实现说明
-- [主窗口源码](gui/main_window.py) - MainWindow类实现
-- [设置面板源码](gui/settings_panel.py) - SettingsPanel类实现
-
----
 
 **GUI模块开发者**: LXR
-**最后更新**: 2025年11月9日
+**最后更新**: 2025年11月20日
 
 
 ````

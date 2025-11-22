@@ -11,7 +11,7 @@
 # 开发优先级：⭐ (第10-11周完成)
 
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, font
 from typing import Dict, Optional, Union
 
 
@@ -29,6 +29,10 @@ class SettingsPanel:
             app_config: 应用程序配置字典（从主窗口传入，用于持久化配置）
         """
         self.parent = parent
+
+        # 设置全局字体
+        system_font = font.nametofont("TkDefaultFont")
+        self.parent.option_add("*Font", system_font)
         self.current_page: Optional[str] = None
         self.content_frames: Dict[str, ttk.Frame] = {}
 
@@ -69,8 +73,8 @@ class SettingsPanel:
         # 缩放状态跟踪
         self._resize_state = {
             "lock": False,  # 防止递归调用
-            "width": 1000,  # 初始宽度
-            "height": 666,  # 初始高度 (保持3:2比例)
+            "width": 1200,  # 初始宽度
+            "height": 800,  # 初始高度 (保持3:2比例)
             "initialized": False,  # 是否已完成初始化
         }
 
@@ -216,45 +220,8 @@ class SettingsPanel:
         self._create_scene_checkboxes()
 
         # 场景参数区域
-        params_frame = ttk.LabelFrame(frame, text="通用场景参数", padding="18")
-        params_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 25))
-
-        # 光照条件
-        light_frame = ttk.Frame(params_frame)
-        light_frame.pack(fill=tk.X, pady=(0, 15))
-
-        ttk.Label(light_frame, text="光照条件:", width=12, font=("Arial", 11)).pack(
-            side=tk.LEFT
-        )
-        self.light_condition_var = tk.StringVar(
-            value=self.app_config["scene"]["light_condition"]
-        )
-        ttk.Radiobutton(
-            light_frame, text="明亮", variable=self.light_condition_var, value="bright"
-        ).pack(side=tk.LEFT, padx=8)
-        ttk.Radiobutton(
-            light_frame, text="正常", variable=self.light_condition_var, value="normal"
-        ).pack(side=tk.LEFT, padx=8)
-        ttk.Radiobutton(
-            light_frame, text="昏暗", variable=self.light_condition_var, value="dim"
-        ).pack(side=tk.LEFT, padx=8)
-
-        # 检测区域
-        area_frame = ttk.Frame(params_frame)
-        area_frame.pack(fill=tk.X, pady=(0, 15))
-
-        ttk.Label(area_frame, text="检测区域:", width=12, font=("Arial", 11)).pack(
-            side=tk.LEFT
-        )
-        self.enable_roi_var = tk.BooleanVar(
-            value=self.app_config["scene"]["enable_roi"]
-        )
-        ttk.Checkbutton(
-            area_frame,
-            text="启用感兴趣区域(ROI)",
-            variable=self.enable_roi_var,
-            command=self._toggle_roi,
-        ).pack(side=tk.LEFT, padx=(8, 0))
+        params_frame = ttk.LabelFrame(frame, text="通用场景参数", padding="15")
+        params_frame.pack(fill=tk.X, pady=(0, 15))
 
         # 报警设置
         alarm_frame = ttk.Frame(params_frame)
@@ -274,12 +241,12 @@ class SettingsPanel:
             value=self.app_config["scene"]["enable_email"]
         )
         ttk.Checkbutton(
-            alarm_frame, text="邮件通知", variable=self.enable_email_var
+            alarm_frame, text="短信通知", variable=self.enable_email_var
         ).pack(side=tk.LEFT, padx=8)
 
         # 录像设置
         record_frame = ttk.Frame(params_frame)
-        record_frame.pack(fill=tk.X, pady=(0, 15))
+        record_frame.pack(fill=tk.X, pady=(0, 0))
 
         ttk.Label(record_frame, text="录像设置:", width=12, font=("Arial", 11)).pack(
             side=tk.LEFT
@@ -293,11 +260,7 @@ class SettingsPanel:
 
         # 按钮区域
         button_frame = ttk.Frame(frame)
-        button_frame.pack(fill=tk.X, pady=(15, 0))
-
-        ttk.Button(
-            button_frame, text="设置ROI区域", command=self._set_roi_area, padding=6
-        ).pack(side=tk.LEFT, padx=(0, 12))
+        button_frame.pack(fill=tk.X, pady=(15, 10))
 
         ttk.Button(
             button_frame,
@@ -627,7 +590,7 @@ class SettingsPanel:
                 "light_condition": str,         # 光照条件：'bright' | 'normal' | 'dim'
                 "enable_roi": bool,             # 是否启用ROI
                 "enable_sound": bool,           # 是否启用声音报警
-                "enable_email": bool,           # 是否启用邮件通知
+                "enable_email": bool,           # 是否启用短信通知
                 "auto_record": bool,            # 是否自动录像
             }
 
@@ -1183,7 +1146,7 @@ def main() -> None:
     """测试设置面板"""
     root = tk.Tk()
     root.title("DLC检测系统 - 设置")
-    root.geometry("1000x666")  # 最小尺寸,保持3:2比例
+    root.geometry("1200x800")  # 最小尺寸,保持3:2比例
 
     # 创建设置面板
     panel = SettingsPanel(root)
