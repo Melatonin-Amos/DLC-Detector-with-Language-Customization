@@ -51,8 +51,6 @@ assets/test_videos/**/*.mp4
 assets/test_videos/**/*.avi
 assets/test_videos/**/*.mov
 
-# RTSP配置（包含密码）
-assets/rtsp_streams/stream_configs.json
 
 # MacOS
 .DS_Store

@@ -11,7 +11,7 @@
 # 开发优先级：⭐ (第10-11周完成)
 
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, font
 from typing import Dict, Optional, Union
 
 
@@ -29,6 +29,10 @@ class SettingsPanel:
             app_config: 应用程序配置字典（从主窗口传入，用于持久化配置）
         """
         self.parent = parent
+
+        # 设置全局字体
+        system_font = font.nametofont("TkDefaultFont")
+        self.parent.option_add("*Font", system_font)
         self.current_page: Optional[str] = None
         self.content_frames: Dict[str, ttk.Frame] = {}
 
@@ -36,15 +40,9 @@ class SettingsPanel:
         if app_config is None:
             # 测试模式：创建默认配置
             self.app_config = {
-                "rtsp": {
-                    "url": "rtsp://",
-                    "username": "",
-                    "password": "",
-                    "port": "554",
-                    "timeout": "10",
-                },
                 "scene": {
-                    "scene_type": "摔倒",
+                    "scene_type": "摔倒",  # 保留用于向后兼容
+                    "selected_scenes": ["摔倒"],  # 新增：用户选择的多个场景
                     "light_condition": "normal",
                     "enable_roi": False,
                     "enable_sound": True,
@@ -56,9 +54,18 @@ class SettingsPanel:
         else:
             # 生产模式：使用主窗口传入的配置
             self.app_config = app_config
+            # 确保存在 selected_scenes 字段（向后兼容）
+            if "selected_scenes" not in self.app_config["scene"]:
+                # 从旧的 scene_type 初始化
+                self.app_config["scene"]["selected_scenes"] = [
+                    self.app_config["scene"]["scene_type"]
+                ]
 
         # 场景类型列表（引用配置中的数据）
         self.scene_types: list[str] = self.app_config["scene_types"]
+
+        # 场景复选框变量字典 {场景名: BooleanVar}
+        self.scene_checkbox_vars: Dict[str, tk.BooleanVar] = {}
 
         # 设置窗口长宽比 (3:2)
         self.aspect_ratio = 3 / 2
@@ -66,8 +73,8 @@ class SettingsPanel:
         # 缩放状态跟踪
         self._resize_state = {
             "lock": False,  # 防止递归调用
-            "width": 1000,  # 初始宽度
-            "height": 666,  # 初始高度 (保持3:2比例)
+            "width": 1200,  # 初始宽度
+            "height": 800,  # 初始高度 (保持3:2比例)
             "initialized": False,  # 是否已完成初始化
         }
 
@@ -83,8 +90,8 @@ class SettingsPanel:
         # 创建各个设置页面
         self._create_pages()
 
-        # 默认显示第一个页面
-        self.show_page("rtsp")
+        # 默认显示场景页面
+        self.show_page("scene")
 
         # 绑定窗口缩放事件
         self.parent.bind("<Configure>", self._on_window_resize)
@@ -102,21 +109,11 @@ class SettingsPanel:
     def _create_navigation(self) -> None:
         """创建左侧导航栏"""
         # 导航栏框架
-        nav_frame = ttk.LabelFrame(self.main_container, text="设置选项", padding="10")
+        nav_frame = ttk.LabelFrame(self.main_container, text="设置选项", padding="15")
         nav_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
 
         # 导航按钮样式配置
-        button_style = {"width": 20, "padding": 10}
-
-        # 1. RTSP流配置按钮
-        self.btn_rtsp = ttk.Button(
-            nav_frame,
-            text="📡 RTSP流配置",
-            command=lambda: self.show_page("rtsp"),
-            **button_style,
-        )
-        self.btn_rtsp.pack(fill=tk.X, pady=(0, 10))
-
+        button_style = {"width": 20, "padding": 12}
         # 2. 场景配置按钮
         self.btn_scene = ttk.Button(
             nav_frame,
@@ -124,11 +121,9 @@ class SettingsPanel:
             command=lambda: self.show_page("scene"),
             **button_style,
         )
-        self.btn_scene.pack(fill=tk.X, pady=(0, 10))
-
+        self.btn_scene.pack(fill=tk.X, pady=(0, 15))
         # 保存按钮列表以便高亮显示
         self.nav_buttons = {
-            "rtsp": self.btn_rtsp,
             "scene": self.btn_scene,
         }
 
@@ -161,220 +156,172 @@ class SettingsPanel:
 
     def _create_pages(self) -> None:
         """创建所有设置页面"""
-        # 创建RTSP流配置页面
-        self.content_frames["rtsp"] = self._create_rtsp_page()
-
         # 创建场景配置页面
         self.content_frames["scene"] = self._create_scene_page()
 
-    def _create_rtsp_page(self) -> ttk.Frame:
-        """创建RTSP流配置页面"""
-        frame = ttk.LabelFrame(
-            self.content_container, text="📡 RTSP流配置", padding="20"
-        )
-
-        # 说明文字
-        desc_label = ttk.Label(
-            frame,
-            text="配置视频流的RTSP连接参数",
-            font=("Arial", 10, "italic"),
-            foreground="gray",
-        )
-        desc_label.pack(anchor="w", pady=(0, 20))
-
-        # RTSP URL输入
-        url_frame = ttk.Frame(frame)
-        url_frame.pack(fill=tk.X, pady=(0, 15))
-
-        ttk.Label(url_frame, text="RTSP URL:", width=15).pack(side=tk.LEFT)
-        self.rtsp_url_var = tk.StringVar(value=self.app_config["rtsp"]["url"])
-        rtsp_entry = ttk.Entry(url_frame, textvariable=self.rtsp_url_var, width=50)
-        rtsp_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(5, 0))
-
-        # 用户名输入
-        user_frame = ttk.Frame(frame)
-        user_frame.pack(fill=tk.X, pady=(0, 15))
-
-        ttk.Label(user_frame, text="用户名:", width=15).pack(side=tk.LEFT)
-        self.rtsp_user_var = tk.StringVar(value=self.app_config["rtsp"]["username"])
-        user_entry = ttk.Entry(user_frame, textvariable=self.rtsp_user_var, width=30)
-        user_entry.pack(side=tk.LEFT, padx=(5, 0))
-
-        # 密码输入
-        pass_frame = ttk.Frame(frame)
-        pass_frame.pack(fill=tk.X, pady=(0, 15))
-
-        ttk.Label(pass_frame, text="密码:", width=15).pack(side=tk.LEFT)
-        self.rtsp_pass_var = tk.StringVar(value=self.app_config["rtsp"]["password"])
-        pass_entry = ttk.Entry(
-            pass_frame, textvariable=self.rtsp_pass_var, show="*", width=30
-        )
-        pass_entry.pack(side=tk.LEFT, padx=(5, 0))
-
-        # 端口号输入
-        port_frame = ttk.Frame(frame)
-        port_frame.pack(fill=tk.X, pady=(0, 15))
-
-        ttk.Label(port_frame, text="端口号:", width=15).pack(side=tk.LEFT)
-        self.rtsp_port_var = tk.StringVar(value=self.app_config["rtsp"]["port"])
-        port_entry = ttk.Entry(port_frame, textvariable=self.rtsp_port_var, width=10)
-        port_entry.pack(side=tk.LEFT, padx=(5, 0))
-
-        # 超时设置
-        timeout_frame = ttk.Frame(frame)
-        timeout_frame.pack(fill=tk.X, pady=(0, 20))
-
-        ttk.Label(timeout_frame, text="连接超时(秒):", width=15).pack(side=tk.LEFT)
-        self.rtsp_timeout_var = tk.IntVar(value=int(self.app_config["rtsp"]["timeout"]))
-        timeout_spinbox = ttk.Spinbox(
-            timeout_frame,
-            from_=5,
-            to=60,
-            textvariable=self.rtsp_timeout_var,
-            width=10,
-        )
-        timeout_spinbox.pack(side=tk.LEFT, padx=(5, 0))
-
-        # 按钮区域
-        button_frame = ttk.Frame(frame)
-        button_frame.pack(fill=tk.X, pady=(10, 0))
-
-        ttk.Button(
-            button_frame, text="测试连接", command=self._test_rtsp_connection
-        ).pack(side=tk.LEFT, padx=(0, 10))
-
-        ttk.Button(button_frame, text="保存配置", command=self._save_rtsp_config).pack(
-            side=tk.LEFT
-        )
-
-        return frame
-
     def _create_scene_page(self) -> ttk.Frame:
         """创建场景配置页面"""
-        frame = ttk.LabelFrame(self.content_container, text="🎬 场景配置", padding="20")
+        frame = ttk.LabelFrame(self.content_container, text="🎬 场景配置", padding="25")
 
         # 说明文字
         desc_label = ttk.Label(
             frame,
-            text="配置不同检测场景的参数",
-            font=("Arial", 10, "italic"),
+            text="选择要启用的检测场景（可多选）",
+            font=("Arial", 12, "italic"),
             foreground="gray",
         )
-        desc_label.pack(anchor="w", pady=(0, 20))
+        desc_label.pack(anchor="w", pady=(0, 25))
 
-        # 场景选择和新建
-        scene_select_frame = ttk.Frame(frame)
-        scene_select_frame.pack(fill=tk.X, pady=(0, 15))
-
-        ttk.Label(scene_select_frame, text="场景类型:", width=15).pack(side=tk.LEFT)
-        self.scene_type_var = tk.StringVar(value=self.app_config["scene"]["scene_type"])
-        self.scene_combo = ttk.Combobox(
-            scene_select_frame,
-            textvariable=self.scene_type_var,
-            values=self.scene_types,
-            state="readonly",
-            width=20,
-        )
-        self.scene_combo.pack(side=tk.LEFT, padx=(5, 10))
-        self.scene_combo.bind("<<ComboboxSelected>>", self._on_scene_change)
+        # 场景管理按钮区
+        button_frame = ttk.Frame(frame)
+        button_frame.pack(fill=tk.X, pady=(0, 20))
 
         # 新建场景按钮
         ttk.Button(
-            scene_select_frame,
+            button_frame,
             text="➕ 新建场景",
             command=self._create_new_scene,
-            width=12,
-        ).pack(side=tk.LEFT, padx=(0, 10))
+            width=13,
+            padding=5,
+        ).pack(side=tk.LEFT, padx=(0, 12))
 
         # 删除场景按钮
         ttk.Button(
-            scene_select_frame,
-            text="删除场景",
-            command=self._delete_current_scene,
-            width=12,
+            button_frame,
+            text="🗑️ 删除场景",
+            command=self._delete_selected_scenes,
+            width=13,
+            padding=5,
         ).pack(side=tk.LEFT)
 
+        # 场景选择区域（可滚动）
+        scene_frame = ttk.LabelFrame(frame, text="场景列表（勾选启用）", padding="18")
+        scene_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 20))
+
+        # 创建滚动条和画布
+        canvas = tk.Canvas(scene_frame, height=150, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(scene_frame, orient="vertical", command=canvas.yview)
+        self.scrollable_frame = ttk.Frame(canvas)
+
+        self.scrollable_frame.bind(
+            "<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+
+        canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # 存储画布和滚动框架的引用
+        self.scene_canvas = canvas
+
+        # 创建场景复选框
+        self._create_scene_checkboxes()
+
         # 场景参数区域
-        params_frame = ttk.LabelFrame(frame, text="场景参数", padding="15")
-        params_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 20))
-
-        # 光照条件
-        light_frame = ttk.Frame(params_frame)
-        light_frame.pack(fill=tk.X, pady=(0, 10))
-
-        ttk.Label(light_frame, text="光照条件:", width=15).pack(side=tk.LEFT)
-        self.light_condition_var = tk.StringVar(
-            value=self.app_config["scene"]["light_condition"]
-        )
-        ttk.Radiobutton(
-            light_frame, text="明亮", variable=self.light_condition_var, value="bright"
-        ).pack(side=tk.LEFT, padx=5)
-        ttk.Radiobutton(
-            light_frame, text="正常", variable=self.light_condition_var, value="normal"
-        ).pack(side=tk.LEFT, padx=5)
-        ttk.Radiobutton(
-            light_frame, text="昏暗", variable=self.light_condition_var, value="dim"
-        ).pack(side=tk.LEFT, padx=5)
-
-        # 检测区域
-        area_frame = ttk.Frame(params_frame)
-        area_frame.pack(fill=tk.X, pady=(0, 10))
-
-        ttk.Label(area_frame, text="检测区域:", width=15).pack(side=tk.LEFT)
-        self.enable_roi_var = tk.BooleanVar(
-            value=self.app_config["scene"]["enable_roi"]
-        )
-        ttk.Checkbutton(
-            area_frame,
-            text="启用感兴趣区域(ROI)",
-            variable=self.enable_roi_var,
-            command=self._toggle_roi,
-        ).pack(side=tk.LEFT, padx=(5, 0))
+        params_frame = ttk.LabelFrame(frame, text="通用场景参数", padding="15")
+        params_frame.pack(fill=tk.X, pady=(0, 15))
 
         # 报警设置
         alarm_frame = ttk.Frame(params_frame)
-        alarm_frame.pack(fill=tk.X, pady=(0, 10))
+        alarm_frame.pack(fill=tk.X, pady=(0, 15))
 
-        ttk.Label(alarm_frame, text="报警设置:", width=15).pack(side=tk.LEFT)
+        ttk.Label(alarm_frame, text="报警设置:", width=12, font=("Arial", 11)).pack(
+            side=tk.LEFT
+        )
         self.enable_sound_var = tk.BooleanVar(
             value=self.app_config["scene"]["enable_sound"]
         )
         ttk.Checkbutton(
             alarm_frame, text="声音报警", variable=self.enable_sound_var
-        ).pack(side=tk.LEFT, padx=5)
+        ).pack(side=tk.LEFT, padx=8)
 
         self.enable_email_var = tk.BooleanVar(
             value=self.app_config["scene"]["enable_email"]
         )
         ttk.Checkbutton(
-            alarm_frame, text="邮件通知", variable=self.enable_email_var
-        ).pack(side=tk.LEFT, padx=5)
+            alarm_frame, text="短信通知", variable=self.enable_email_var
+        ).pack(side=tk.LEFT, padx=8)
 
         # 录像设置
         record_frame = ttk.Frame(params_frame)
-        record_frame.pack(fill=tk.X, pady=(0, 10))
+        record_frame.pack(fill=tk.X, pady=(0, 0))
 
-        ttk.Label(record_frame, text="录像设置:", width=15).pack(side=tk.LEFT)
+        ttk.Label(record_frame, text="录像设置:", width=12, font=("Arial", 11)).pack(
+            side=tk.LEFT
+        )
         self.auto_record_var = tk.BooleanVar(
             value=self.app_config["scene"]["auto_record"]
         )
         ttk.Checkbutton(
             record_frame, text="事件触发时自动录像", variable=self.auto_record_var
-        ).pack(side=tk.LEFT, padx=(5, 0))
+        ).pack(side=tk.LEFT, padx=(8, 0))
 
         # 按钮区域
         button_frame = ttk.Frame(frame)
-        button_frame.pack(fill=tk.X, pady=(10, 0))
-
-        ttk.Button(button_frame, text="设置ROI区域", command=self._set_roi_area).pack(
-            side=tk.LEFT, padx=(0, 10)
-        )
+        button_frame.pack(fill=tk.X, pady=(15, 10))
 
         ttk.Button(
-            button_frame, text="保存场景配置", command=self._save_scene_config
+            button_frame,
+            text="保存场景配置",
+            command=self._save_scene_config,
+            padding=6,
         ).pack(side=tk.LEFT)
 
         return frame
+
+    def _create_scene_checkboxes(self) -> None:
+        """创建场景复选框列表"""
+        # 清空现有复选框
+        for widget in self.scrollable_frame.winfo_children():
+            widget.destroy()
+
+        self.scene_checkbox_vars.clear()
+
+        # 获取已选中的场景列表
+        selected_scenes = self.app_config["scene"]["selected_scenes"]
+
+        # 为每个场景创建复选框
+        for i, scene in enumerate(self.scene_types):
+            var = tk.BooleanVar(value=scene in selected_scenes)
+            self.scene_checkbox_vars[scene] = var
+
+            checkbox = ttk.Checkbutton(
+                self.scrollable_frame,
+                text=scene,
+                variable=var,
+                command=self._on_scene_checkbox_change,
+                style="TCheckbutton",
+            )
+            checkbox.grid(row=i, column=0, sticky="w", padx=15, pady=8)
+
+        # 如果没有场景，显示提示
+        if not self.scene_types:
+            ttk.Label(
+                self.scrollable_frame,
+                text="暂无场景，请点击'新建场景'添加",
+                foreground="gray",
+                font=("Arial", 11, "italic"),
+            ).grid(row=0, column=0, padx=15, pady=20)
+
+    def _on_scene_checkbox_change(self) -> None:
+        """场景复选框状态改变时的回调"""
+        # 更新选中的场景列表
+        selected = [
+            scene for scene, var in self.scene_checkbox_vars.items() if var.get()
+        ]
+        self.app_config["scene"]["selected_scenes"] = selected
+
+        # 更新 scene_type 为第一个选中的场景（保持向后兼容）
+        if selected:
+            self.app_config["scene"]["scene_type"] = selected[0]
+        else:
+            # 如果没有选中任何场景，保持原值或设为空
+            if self.scene_types:
+                self.app_config["scene"]["scene_type"] = self.scene_types[0]
+
+        print(f"已选中的场景: {selected}")
 
     def show_page(self, page_name: str) -> None:
         """
@@ -396,28 +343,6 @@ class SettingsPanel:
             # 这里可以通过修改按钮样式来高亮当前选中的按钮
 
     # ========== 回调函数 ==========
-
-    def _test_rtsp_connection(self) -> None:
-        """测试RTSP连接"""
-        url = self.rtsp_url_var.get()
-        if not url or url == "rtsp://":
-            messagebox.showwarning("警告", "请输入有效的RTSP URL")
-            return
-
-        messagebox.showinfo("测试连接", f"正在测试连接: {url}\n(此功能待实现)")
-        # TODO: 实现实际的RTSP连接测试
-
-    def _save_rtsp_config(self) -> None:
-        """保存RTSP配置"""
-        # 更新共享配置
-        self.app_config["rtsp"]["url"] = self.rtsp_url_var.get()
-        self.app_config["rtsp"]["username"] = self.rtsp_user_var.get()
-        self.app_config["rtsp"]["password"] = self.rtsp_pass_var.get()
-        self.app_config["rtsp"]["port"] = self.rtsp_port_var.get()
-        self.app_config["rtsp"]["timeout"] = str(self.rtsp_timeout_var.get())
-
-        messagebox.showinfo("保存成功", "RTSP配置已保存")
-        print(f"RTSP配置已保存到app_config: {self.app_config['rtsp']}")
 
     def _on_scene_change(self, event=None) -> None:
         """场景类型改变时的回调"""
@@ -442,29 +367,29 @@ class SettingsPanel:
         dialog.grab_set()
 
         # 创建输入框架
-        input_frame = ttk.Frame(dialog, padding="30")
+        input_frame = ttk.Frame(dialog, padding="35")
         input_frame.pack(fill=tk.BOTH, expand=True)
 
         # 说明标签
         ttk.Label(
-            input_frame, text="请输入新场景的名称：", font=("Arial", 12, "bold")
-        ).pack(pady=(10, 20))
+            input_frame, text="请输入新场景的名称：", font=("Arial", 13, "bold")
+        ).pack(pady=(10, 25))
 
         # 场景名称输入框
         scene_name_var = tk.StringVar()
         name_entry = ttk.Entry(
             input_frame, textvariable=scene_name_var, font=("Arial", 12), width=30
         )
-        name_entry.pack(pady=(0, 20))
+        name_entry.pack(pady=(0, 25))
         name_entry.focus()
 
         # 提示文字
         ttk.Label(
             input_frame,
             text="例如：跌倒、起火、闯入等",
-            font=("Arial", 9),
+            font=("Arial", 10),
             foreground="gray",
-        ).pack(pady=(0, 30))
+        ).pack(pady=(0, 35))
 
         def on_confirm():
             """确认创建"""
@@ -485,16 +410,12 @@ class SettingsPanel:
             # 添加到场景列表
             self.scene_types.append(scene_name)
 
-            # 更新下拉框
-            self.scene_combo["values"] = self.scene_types
-
-            # 选中新创建的场景
-            self.scene_type_var.set(scene_name)
+            # 重新创建复选框列表
+            self._create_scene_checkboxes()
 
             messagebox.showinfo(
                 "创建成功", f"场景 '{scene_name}' 已成功创建", parent=dialog
             )
-
             dialog.destroy()
 
         def on_cancel():
@@ -520,35 +441,50 @@ class SettingsPanel:
         # 等待对话框关闭
         dialog.wait_window()
 
-    def _delete_current_scene(self) -> None:
-        """删除当前选中的场景"""
-        current_scene = self.scene_type_var.get()
+    def _delete_selected_scenes(self) -> None:
+        """删除选中的场景"""
+        # 获取当前选中的场景
+        selected_scenes = [
+            scene for scene, var in self.scene_checkbox_vars.items() if var.get()
+        ]
 
-        # 检查是否是内置场景
+        if not selected_scenes:
+            messagebox.showwarning("未选择场景", "请先勾选要删除的场景")
+            return
+
+        # 检查是否包含内置场景
         builtin_scenes = ["摔倒", "起火"]
-        if current_scene in builtin_scenes:
+        builtin_selected = [s for s in selected_scenes if s in builtin_scenes]
+
+        if builtin_selected:
             messagebox.showwarning(
-                "无法删除", f"'{current_scene}' 是内置场景，无法删除"
+                "无法删除",
+                f"以下场景是内置场景，无法删除：\n{', '.join(builtin_selected)}\n\n请取消勾选后再试",
             )
             return
 
         # 确认删除
+        scene_list = "\n".join(f"• {s}" for s in selected_scenes)
         result = messagebox.askyesno(
-            "确认删除", f"确定要删除场景 '{current_scene}' 吗？\n此操作无法撤销。"
+            "确认删除", f"确定要删除以下场景吗？\n\n{scene_list}\n\n此操作无法撤销。"
         )
 
         if result:
-            # 从列表中移除
-            self.scene_types.remove(current_scene)
+            # 从列表中移除选中的场景
+            for scene in selected_scenes:
+                if scene in self.scene_types:
+                    self.scene_types.remove(scene)
 
-            # 更新下拉框
-            self.scene_combo["values"] = self.scene_types
+            # 从已选中列表中移除
+            current_selected = self.app_config["scene"]["selected_scenes"]
+            self.app_config["scene"]["selected_scenes"] = [
+                s for s in current_selected if s not in selected_scenes
+            ]
 
-            # 切换到第一个场景
-            if self.scene_types:
-                self.scene_type_var.set(self.scene_types[0])
+            # 重新创建复选框
+            self._create_scene_checkboxes()
 
-            messagebox.showinfo("删除成功", f"场景 '{current_scene}' 已删除")
+            messagebox.showinfo("删除成功", f"已成功删除 {len(selected_scenes)} 个场景")
 
     def _toggle_roi(self) -> None:
         """切换ROI启用状态"""
@@ -564,16 +500,597 @@ class SettingsPanel:
 
     def _save_scene_config(self) -> None:
         """保存场景配置"""
-        # 更新共享配置
-        self.app_config["scene"]["scene_type"] = self.scene_type_var.get()
+        # 更新选中的场景列表
+        selected = [
+            scene for scene, var in self.scene_checkbox_vars.items() if var.get()
+        ]
+        self.app_config["scene"]["selected_scenes"] = selected
+
+        # 更新 scene_type（保持向后兼容，取第一个选中的场景）
+        if selected:
+            self.app_config["scene"]["scene_type"] = selected[0]
+
+        # 更新其他配置
         self.app_config["scene"]["light_condition"] = self.light_condition_var.get()
         self.app_config["scene"]["enable_roi"] = self.enable_roi_var.get()
         self.app_config["scene"]["enable_sound"] = self.enable_sound_var.get()
         self.app_config["scene"]["enable_email"] = self.enable_email_var.get()
         self.app_config["scene"]["auto_record"] = self.auto_record_var.get()
 
-        messagebox.showinfo("保存成功", "场景配置已保存")
+        scene_info = f"已选场景: {', '.join(selected) if selected else '无'}"
+        messagebox.showinfo("保存成功", f"场景配置已保存\n\n{scene_info}")
         print(f"场景配置已保存到app_config: {self.app_config['scene']}")
+
+    # ========== 对外公开接口 ==========
+
+    def get_current_scene_type(self) -> str:
+        """
+        获取当前选中的场景类型（第一个选中的场景，用于向后兼容）
+
+        Returns:
+            str: 场景类型名称（如 "摔倒"、"起火"等）
+
+        Example:
+            >>> panel = SettingsPanel(root)
+            >>> scene = panel.get_current_scene_type()
+            >>> print(scene)  # "摔倒"
+
+        Note:
+            如果用户选择了多个场景，此方法返回第一个选中的场景。
+            建议使用 get_selected_scenes() 获取所有选中的场景。
+        """
+        selected = self.app_config["scene"]["selected_scenes"]
+        if selected:
+            return selected[0]
+        # 如果没有选中任何场景，返回第一个可用场景
+        return self.scene_types[0] if self.scene_types else ""
+
+    def get_selected_scenes(self) -> list[str]:
+        """
+        获取所有选中的场景列表（新接口，推荐使用）
+
+        Returns:
+            list[str]: 用户选中的所有场景类型列表
+
+        Example:
+            >>> panel = SettingsPanel(root)
+            >>> scenes = panel.get_selected_scenes()
+            >>> print(scenes)  # ["摔倒", "起火", "闯入"]
+            >>> for scene in scenes:
+            ...     prompts = get_prompts_for_scene(scene)
+            ...     detect(frame, prompts)
+        """
+        return self.app_config["scene"]["selected_scenes"].copy()
+
+    def get_all_scene_types(self) -> list[str]:
+        """
+        获取所有可用的场景类型列表
+
+        Returns:
+            list[str]: 场景类型列表，包含内置场景和用户自定义场景
+
+        Example:
+            >>> panel = SettingsPanel(root)
+            >>> scenes = panel.get_all_scene_types()
+            >>> print(scenes)  # ["摔倒", "起火", "闯入"]
+        """
+        return self.scene_types.copy()
+
+    def get_scene_config(self) -> Dict:
+        """
+        获取当前场景的完整配置
+
+        Returns:
+            Dict: 包含所有场景参数的字典
+
+        Dictionary Structure:
+            {
+                "scene_type": str,              # 第一个选中的场景（向后兼容）
+                "selected_scenes": list[str],   # 所有选中的场景列表（新增）
+                "light_condition": str,         # 光照条件：'bright' | 'normal' | 'dim'
+                "enable_roi": bool,             # 是否启用ROI
+                "enable_sound": bool,           # 是否启用声音报警
+                "enable_email": bool,           # 是否启用短信通知
+                "auto_record": bool,            # 是否自动录像
+            }
+
+        Example:
+            >>> panel = SettingsPanel(root)
+            >>> config = panel.get_scene_config()
+            >>> print(config["scene_type"])        # "摔倒"（第一个）
+            >>> print(config["selected_scenes"])   # ["摔倒", "起火"]（所有）
+            >>> print(config["light_condition"])   # "normal"
+            >>> print(config["enable_roi"])        # False
+        """
+        selected = self.app_config["scene"]["selected_scenes"]
+        return {
+            "scene_type": (
+                selected[0]
+                if selected
+                else (self.scene_types[0] if self.scene_types else "")
+            ),
+            "selected_scenes": selected.copy(),
+            "light_condition": self.light_condition_var.get(),
+            "enable_roi": self.enable_roi_var.get(),
+            "enable_sound": self.enable_sound_var.get(),
+            "enable_email": self.enable_email_var.get(),
+            "auto_record": self.auto_record_var.get(),
+        }
+
+    def get_light_condition(self) -> str:
+        """
+        获取当前光照条件设置
+
+        Returns:
+            str: 光照条件，可能的值: 'bright'（明亮）、'normal'（正常）、'dim'（昏暗）
+
+        Example:
+            >>> panel = SettingsPanel(root)
+            >>> light = panel.get_light_condition()
+            >>> if light == "dim":
+            ...     # 调整检测算法的灵敏度
+        """
+        return self.light_condition_var.get()
+
+    def get_roi_settings(self) -> Dict:
+        """
+        获取ROI（感兴趣区域）相关设置
+
+        Returns:
+            Dict: ROI设置字典
+
+        Dictionary Structure:
+            {
+                "enabled": bool,     # 是否启用ROI
+                "coordinates": None  # ROI坐标（待实现，目前为None）
+            }
+
+        Example:
+            >>> panel = SettingsPanel(root)
+            >>> roi = panel.get_roi_settings()
+            >>> if roi["enabled"]:
+            ...     # 只在ROI区域内进行检测
+            ...     coords = roi["coordinates"]
+        """
+        return {
+            "enabled": self.enable_roi_var.get(),
+            "coordinates": None,  # TODO: 实现ROI坐标存储
+        }
+
+    def get_alert_settings(self) -> Dict:
+        """
+        获取报警设置
+
+        Returns:
+            Dict: 报警设置字典
+
+        Dictionary Structure:
+            {
+                "sound": bool,    # 是否启用声音报警
+                "email": bool,    # 是否启用邮件通知
+                "record": bool,   # 是否自动录像
+            }
+
+        Example:
+            >>> panel = SettingsPanel(root)
+            >>> alerts = panel.get_alert_settings()
+            >>> if alerts["sound"]:
+            ...     play_alert_sound()
+            >>> if alerts["email"]:
+            ...     send_email_notification()
+            >>> if alerts["record"]:
+            ...     start_recording()
+        """
+        return {
+            "sound": self.enable_sound_var.get(),
+            "email": self.enable_email_var.get(),
+            "record": self.auto_record_var.get(),
+        }
+
+    def set_scene_type(self, scene_type: str) -> bool:
+        """
+        以编程方式设置场景类型（供外部调用，向后兼容）
+
+        Args:
+            scene_type: 场景类型名称
+
+        Returns:
+            bool: 设置成功返回True，场景不存在返回False
+
+        Example:
+            >>> panel = SettingsPanel(root)
+            >>> success = panel.set_scene_type("起火")
+            >>> if success:
+            ...     print("场景切换成功")
+
+        Note:
+            此方法会将选中场景列表设置为只包含指定场景。
+            如需选中多个场景，请使用 set_selected_scenes()。
+        """
+        if scene_type in self.scene_types:
+            # 设置为只选中这一个场景
+            self.app_config["scene"]["selected_scenes"] = [scene_type]
+            self.app_config["scene"]["scene_type"] = scene_type
+            # 更新复选框状态
+            if hasattr(self, "scene_checkbox_vars"):
+                for scene, var in self.scene_checkbox_vars.items():
+                    var.set(scene == scene_type)
+            return True
+        return False
+
+    def set_selected_scenes(self, scene_list: list[str]) -> bool:
+        """
+        以编程方式设置选中的多个场景（新接口）
+
+        Args:
+            scene_list: 场景类型名称列表
+
+        Returns:
+            bool: 设置成功返回True，场景列表为空或包含不存在的场景返回False
+
+        Example:
+            >>> panel = SettingsPanel(root)
+            >>> success = panel.set_selected_scenes(["摔倒", "起火", "闯入"])
+            >>> if success:
+            ...     print("场景选择成功")
+            ...     scenes = panel.get_selected_scenes()
+            ...     print(f"已选场景: {scenes}")
+        """
+        if not scene_list:
+            return False
+
+        # 检查所有场景是否存在
+        for scene in scene_list:
+            if scene not in self.scene_types:
+                return False
+
+        # 更新配置
+        self.app_config["scene"]["selected_scenes"] = scene_list.copy()
+        self.app_config["scene"]["scene_type"] = scene_list[0]
+
+        # 更新复选框状态
+        if hasattr(self, "scene_checkbox_vars"):
+            for scene, var in self.scene_checkbox_vars.items():
+                var.set(scene in scene_list)
+
+        return True
+
+    def add_scene_type(self, scene_name: str) -> bool:
+        """
+        以编程方式添加新的场景类型（供外部调用）
+
+        Args:
+            scene_name: 新场景的名称
+
+        Returns:
+            bool: 添加成功返回True，场景已存在或名称为空返回False
+
+        Example:
+            >>> panel = SettingsPanel(root)
+            >>> success = panel.add_scene_type("闯入")
+            >>> if success:
+            ...     print(f"已添加场景: 闯入")
+            ...     panel.set_scene_type("闯入")
+        """
+        scene_name = scene_name.strip()
+
+        if not scene_name or scene_name in self.scene_types:
+            return False
+
+        # 添加到场景列表
+        self.scene_types.append(scene_name)
+
+        # 更新复选框列表（如果已创建）
+        if hasattr(self, "scrollable_frame"):
+            self._create_scene_checkboxes()
+
+        return True
+
+    def update_scene_config(self, config: Dict) -> None:
+        """
+        以编程方式更新场景配置（供外部调用）
+
+        Args:
+            config: 配置字典，可以包含以下任意键：
+                - scene_type: str（单个场景，向后兼容）
+                - selected_scenes: list[str]（多个场景，新增）
+                - light_condition: str ('bright' | 'normal' | 'dim')
+                - enable_roi: bool
+                - enable_sound: bool
+                - enable_email: bool
+                - auto_record: bool
+
+        Example:
+            >>> panel = SettingsPanel(root)
+            >>> # 方式1：单场景（向后兼容）
+            >>> panel.update_scene_config({
+            ...     "scene_type": "起火",
+            ...     "light_condition": "bright",
+            ...     "enable_sound": True
+            ... })
+            >>>
+            >>> # 方式2：多场景（推荐）
+            >>> panel.update_scene_config({
+            ...     "selected_scenes": ["摔倒", "起火", "闯入"],
+            ...     "light_condition": "normal",
+            ...     "enable_email": True
+            ... })
+        """
+        # 处理多场景选择（优先）
+        if "selected_scenes" in config:
+            scene_list = config["selected_scenes"]
+            if isinstance(scene_list, list) and scene_list:
+                valid_scenes = [s for s in scene_list if s in self.scene_types]
+                if valid_scenes:
+                    self.app_config["scene"]["selected_scenes"] = valid_scenes
+                    self.app_config["scene"]["scene_type"] = valid_scenes[0]
+                    # 更新复选框
+                    if hasattr(self, "scene_checkbox_vars"):
+                        for scene, var in self.scene_checkbox_vars.items():
+                            var.set(scene in valid_scenes)
+
+        # 处理单场景选择（向后兼容）
+        elif "scene_type" in config and config["scene_type"] in self.scene_types:
+            scene = config["scene_type"]
+            self.app_config["scene"]["selected_scenes"] = [scene]
+            self.app_config["scene"]["scene_type"] = scene
+            # 更新复选框
+            if hasattr(self, "scene_checkbox_vars"):
+                for s, var in self.scene_checkbox_vars.items():
+                    var.set(s == scene)
+
+        if "light_condition" in config:
+            self.light_condition_var.set(config["light_condition"])
+
+        if "enable_roi" in config:
+            self.enable_roi_var.set(config["enable_roi"])
+
+        if "enable_sound" in config:
+            self.enable_sound_var.set(config["enable_sound"])
+
+        if "enable_email" in config:
+            self.enable_email_var.set(config["enable_email"])
+
+        if "auto_record" in config:
+            self.auto_record_var.set(config["auto_record"])
+
+    # ========== 配置监听接口 ==========
+
+    def get_config_snapshot(self) -> Dict:
+        """
+        获取当前配置的完整快照
+
+        Returns:
+            Dict: 包含所有配置参数的字典快照
+
+        Dictionary Structure:
+            {
+                "scene_type": str,              # 当前场景类型
+                "selected_scenes": list[str],   # 所有选中的场景
+                "confidence_threshold": float,   # 置信度阈值
+                "detection_interval": float,     # 检测间隔
+                "camera_id": int,               # 摄像头ID
+                "alert_delay": float,           # 告警延迟
+                "light_condition": str,         # 光照条件
+                "enable_roi": bool,             # 是否启用ROI
+                "enable_sound": bool,           # 是否启用声音报警
+                "enable_email": bool,           # 是否启用邮件通知
+                "auto_record": bool,            # 是否自动录像
+            }
+
+        Example:
+            >>> panel = SettingsPanel(root)
+            >>> snapshot = panel.get_config_snapshot()
+            >>> print(snapshot["selected_scenes"])  # ["摔倒", "起火"]
+        """
+        selected = self.app_config["scene"]["selected_scenes"]
+        scene_config = self.app_config["scene"]
+
+        return {
+            "scene_type": (
+                selected[0]
+                if selected
+                else (self.scene_types[0] if self.scene_types else "")
+            ),
+            "selected_scenes": selected.copy(),
+            "confidence_threshold": scene_config.get("confidence_threshold"),
+            "detection_interval": scene_config.get("detection_interval"),
+            "camera_id": scene_config.get("camera_id"),
+            "alert_delay": scene_config.get("alert_delay"),
+            "light_condition": self.light_condition_var.get(),
+            "enable_roi": self.enable_roi_var.get(),
+            "enable_sound": self.enable_sound_var.get(),
+            "enable_email": self.enable_email_var.get(),
+            "auto_record": self.auto_record_var.get(),
+        }
+
+    def start_config_monitor(
+        self,
+        callback,
+        interval: int = 500,
+        print_changes: bool = True,
+        print_full_config: bool = True,
+    ) -> None:
+        """
+        启动配置监听器，当配置发生变化时自动调用回调函数
+
+        Args:
+            callback: 回调函数，签名为 callback(old_config: Dict, new_config: Dict)
+            interval: 检查间隔（毫秒），默认500ms
+            print_changes: 是否自动打印配置变化，默认True
+            print_full_config: 是否在变化时打印完整配置，默认True
+
+        Example:
+            >>> def on_config_change(old_config, new_config):
+            ...     print("配置已更新！")
+            ...     # 处理配置变化
+            ...     if old_config["scene_type"] != new_config["scene_type"]:
+            ...         reload_detection_model(new_config["scene_type"])
+            >>>
+            >>> panel = SettingsPanel(root)
+            >>> panel.start_config_monitor(on_config_change)
+            >>> # 现在配置变化时会自动调用 on_config_change
+
+        Note:
+            - 监听器会在后台持续运行，直到窗口关闭
+            - 回调函数会在Tkinter主线程中执行
+            - 如果回调函数抛出异常，监听器会继续运行
+        """
+        # 保存初始配置
+        self._last_config = self.get_config_snapshot()
+        self._monitor_callback = callback
+        self._monitor_interval = interval
+        self._monitor_print_changes = print_changes
+        self._monitor_print_full_config = print_full_config
+
+        # 启动监听
+        self._check_config_changes()
+
+    def _check_config_changes(self) -> None:
+        """内部方法：定期检查配置变化"""
+        try:
+            current_config = self.get_config_snapshot()
+
+            # 检查是否有变化
+            if current_config != self._last_config:
+                # 打印变化信息（如果启用）
+                if self._monitor_print_changes:
+                    self._print_config_diff(self._last_config, current_config)
+
+                # 打印完整配置（如果启用）
+                if self._monitor_print_full_config:
+                    self._print_config()
+
+                # 调用用户回调
+                try:
+                    self._monitor_callback(self._last_config, current_config)
+                except Exception as e:
+                    print(f"❌ 配置监听回调函数出错: {e}")
+
+                # 更新上次配置
+                self._last_config = current_config.copy()
+
+            # 继续监听
+            self.parent.after(self._monitor_interval, self._check_config_changes)
+        except Exception as e:
+            print(f"❌ 配置监听出错: {e}")
+            # 即使出错也继续监听
+            self.parent.after(self._monitor_interval, self._check_config_changes)
+
+    def _print_config_diff(self, old_config: Dict, new_config: Dict) -> None:
+        """内部方法：打印配置变化的详细信息"""
+        print("\n" + "🔄" * 30)
+        print("检测到配置变化！")
+        print("🔄" * 30)
+
+        changes = []
+
+        # 检查场景类型变化
+        if old_config.get("scene_type") != new_config.get("scene_type"):
+            changes.append(
+                f"🎯 场景类型: {old_config.get('scene_type')} → {new_config.get('scene_type')}"
+            )
+
+        # 检查选中场景列表变化
+        old_scenes = set(old_config.get("selected_scenes", []))
+        new_scenes = set(new_config.get("selected_scenes", []))
+        if old_scenes != new_scenes:
+            added = new_scenes - old_scenes
+            removed = old_scenes - new_scenes
+            if added:
+                changes.append(f"📌 新增场景: {', '.join(added)}")
+            if removed:
+                changes.append(f"📌 移除场景: {', '.join(removed)}")
+            if not added and not removed:
+                changes.append(f"📌 场景顺序已改变")
+
+        # 检查其他参数变化
+        param_names = {
+            "confidence_threshold": "置信度阈值",
+            "detection_interval": "检测间隔",
+            "camera_id": "摄像头ID",
+            "alert_delay": "告警延迟",
+            "light_condition": "光照条件",
+            "enable_roi": "启用ROI",
+            "enable_sound": "声音报警",
+            "enable_email": "邮件通知",
+            "auto_record": "自动录像",
+        }
+
+        for key, name in param_names.items():
+            old_val = old_config.get(key)
+            new_val = new_config.get(key)
+            if old_val != new_val:
+                # 布尔值转换为中文
+                if isinstance(old_val, bool):
+                    old_val = "是" if old_val else "否"
+                    new_val = "是" if new_val else "否"
+                changes.append(f"⚙️  {name}: {old_val} → {new_val}")
+
+        # 打印所有变化
+        if changes:
+            for change in changes:
+                print(f"  {change}")
+        else:
+            print("  (未检测到具体变化，可能是内部状态更新)")
+
+        print("🔄" * 30 + "\n")
+
+    def _print_config(self) -> None:
+        """内部方法：打印完整的配置信息"""
+        print("\n" + "=" * 60)
+        print("📋 当前配置信息:")
+        print("=" * 60)
+
+        # 场景配置
+        selected = self.app_config["scene"]["selected_scenes"]
+        print(f"🎯 当前场景类型: {selected[0] if selected else '无'}")
+        print(f"📌 所有选中场景: {', '.join(selected) if selected else '无'}")
+
+        # 其他配置信息
+        scene_config = self.app_config["scene"]
+        print(f"\n⚙️  配置参数:")
+        print(f"   • 置信度阈值: {scene_config.get('confidence_threshold', 'N/A')}")
+        print(f"   • 检测间隔: {scene_config.get('detection_interval', 'N/A')} 秒")
+        print(f"   • 摄像头ID: {scene_config.get('camera_id', 'N/A')}")
+        print(f"   • 告警延迟: {scene_config.get('alert_delay', 'N/A')} 秒")
+
+        # 场景参数
+        print(f"\n🎨 场景参数:")
+        print(f"   • 光照条件: {scene_config.get('light_condition', 'N/A')}")
+        print(f"   • 启用ROI: {'是' if scene_config.get('enable_roi') else '否'}")
+        print(f"   • 声音报警: {'是' if scene_config.get('enable_sound') else '否'}")
+        print(f"   • 邮件通知: {'是' if scene_config.get('enable_email') else '否'}")
+        print(f"   • 自动录像: {'是' if scene_config.get('auto_record') else '否'}")
+        print("=" * 60 + "\n")
+
+    def print_current_config(self) -> None:
+        """
+        手动打印当前配置信息（公共接口）
+
+        Example:
+            >>> panel = SettingsPanel(root)
+            >>> panel.print_current_config()
+            📋 当前配置信息:
+            🎯 当前场景类型: 摔倒
+            ...
+        """
+        self._print_config()
+
+    def stop_config_monitor(self) -> None:
+        """
+        停止配置监听器
+
+        Example:
+            >>> panel = SettingsPanel(root)
+            >>> panel.start_config_monitor(callback)
+            >>> # ... 一段时间后 ...
+            >>> panel.stop_config_monitor()  # 停止监听
+        """
+        # 通过设置一个标志来停止监听
+        if hasattr(self, "_monitor_callback"):
+            self._monitor_callback = None
+            print("✅ 配置监听器已停止")
 
     def _on_window_resize(self, event: tk.Event) -> None:
         """窗口缩放事件处理器，保持窗口宽高比 (3:2)"""
@@ -629,7 +1146,7 @@ def main() -> None:
     """测试设置面板"""
     root = tk.Tk()
     root.title("DLC检测系统 - 设置")
-    root.geometry("1000x666")  # 最小尺寸,保持3:2比例
+    root.geometry("1200x800")  # 最小尺寸,保持3:2比例
 
     # 创建设置面板
     panel = SettingsPanel(root)
