@@ -45,5 +45,5 @@ python main.py mode=camera camera.index=0 # 也有可能为1/2，请您进行尝
 # 输入模式二：使用既有的检测视频/摄像头视频，检测其中的关键帧
 python main.py mode=video video_path=<your_video_path> 
 ```
-python main.py mode=video video_path=assets/test_videos/fire_detection/fire3.mp4
+
 TODO: 完善后续用于开源的README文件
