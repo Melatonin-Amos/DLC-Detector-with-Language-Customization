@@ -38,7 +38,7 @@ class ScenarioConfig:
         
         Args:
             scenario_dict: 场景配置字典（从YAML加载）
-            translator: 中文翻译器（可选）
+            translator: 中文翻译器（可选，FG-CLIP支持中文时为None）
         """
         self.name = scenario_dict.get('name', '')
         self.enabled = scenario_dict.get('enabled', True)
@@ -46,13 +46,17 @@ class ScenarioConfig:
         # 支持单个中文提示词
         prompt_cn = scenario_dict.get('prompt_cn', '')
         
-        # 如果有翻译器且配置了中文提示词，则翻译
+        # 如果有翻译器且配置了中文提示词，则翻译为英文（CLIP需要）
         if translator and prompt_cn:
             self.prompt = translator.translate(prompt_cn)
             logger.debug(f"场景 '{self.name}' 提示词已翻译: {prompt_cn} -> {self.prompt}")
+        elif prompt_cn:
+            # 无翻译器（FG-CLIP支持中文），直接使用中文提示词
+            self.prompt = prompt_cn
+            logger.debug(f"场景 '{self.name}' 使用中文提示词: {prompt_cn}")
         else:
-            # 否则使用英文提示词（向后兼容）
-            self.prompt = scenario_dict.get('prompt', prompt_cn)
+            # 向后兼容：使用英文提示词
+            self.prompt = scenario_dict.get('prompt', '')
         
         self.threshold = scenario_dict.get('threshold', 0.25)
         self.cooldown = scenario_dict.get('cooldown', 30)
@@ -86,12 +90,30 @@ class CLIPDetector:
             config: 完整配置字典（包含detection、model等）
             model_name: CLIP模型名称
             device: 设备
-            translator: 中文翻译器（可选）
+            translator: 中文翻译器（可选，FG-CLIP支持中文则不需要）
         """
         # 初始化或使用已有的CLIP模型
         if clip_model is None:
-            logger.info(f"创建新的CLIP模型: {model_name}")
-            self.clip_model = CLIPWrapper(model_name=model_name, device=device)
+            # 检查模型类型（CLIP或FG-CLIP）
+            model_config = config.get('model', {}) if config else {}
+            model_type = model_config.get('type', 'clip')
+            
+            if model_type == 'fgclip':
+                logger.info(f"创建FG-CLIP 2模型: {model_name}")
+                from ..models.fgclip_wrapper import FGCLIPWrapper
+                max_length = model_config.get('inference', {}).get('max_caption_length', 196)
+                self.clip_model = FGCLIPWrapper(
+                    model_name=model_name,
+                    device=device,
+                    max_caption_length=max_length
+                )
+                # FG-CLIP支持中文，无需翻译器
+                if translator:
+                    logger.info("FG-CLIP 2支持中文，翻译器将被禁用")
+                    translator = None
+            else:
+                logger.info(f"创建CLIP模型: {model_name}")
+                self.clip_model = CLIPWrapper(model_name=model_name, device=device)
         else:
             self.clip_model = clip_model
             logger.info("使用已有的CLIP模型")

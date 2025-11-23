@@ -1,0 +1,16 @@
+# @package _global_.model
+# FG-CLIP 2模型配置
+
+name: qihoo360/fg-clip2-base
+type: fgclip  # 标识使用FG-CLIP而非原始CLIP
+device: auto  # auto | cpu | cuda
+
+# 推理配置
+inference:
+  batch_size: 1
+  temperature: 1.0
+  max_caption_length: 196  # 短描述64，长描述196
+  use_fp16: false
+
+# 模型路径（可选，默认从HuggingFace下载）
+# model_path: /path/to/local/fgclip2-base-patch16

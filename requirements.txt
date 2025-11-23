@@ -6,6 +6,9 @@ numpy>=1.21.0
 # CLIP model
 git+https://github.com/openai/CLIP.git
 
+# FG-CLIP 2 model (optional, for better performance)
+transformers>=4.30.0
+
 # Image processing
 opencv-python>=4.6.0
 pillow>=9.0.0
@@ -15,7 +18,7 @@ hydra-core>=1.3.0
 omegaconf>=2.3.0
 pyyaml>=6.0
 
-# Translation (optional)
+# Translation (optional, not needed for FG-CLIP)
 google-generativeai>=0.3.0
 
 # GUI (optional)
@@ -29,4 +32,3 @@ pytest-cov>=3.0.0
 black>=22.0.0
 flake8>=4.0.0
 ipython>=8.0.0
-
