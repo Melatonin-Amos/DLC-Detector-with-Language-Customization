@@ -12,7 +12,7 @@ scenarios:
     enabled: true
     name: 跌倒检测
     prompt_cn: 老人摔倒在地上
-    threshold: 0.34
+    threshold: 0.6
     cooldown: 30
     consecutive_frames: 2
     alert_level: high
@@ -21,7 +21,7 @@ scenarios:
     enabled: true
     name: 火灾检测
     prompt_cn: 房间里着火了
-    threshold: 0.34
+    threshold: 0.6
     cooldown: 60
     consecutive_frames: 3
     alert_level: high
