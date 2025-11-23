@@ -1,0 +1,27 @@
+# DLC主配置文件（使用FG-CLIP 2模型）
+# FG-CLIP 2原生支持中文，无需翻译器
+
+defaults:
+  - camera: default
+  - detection: default
+  - model: fgclip2  # 使用FG-CLIP 2模型
+  - alert: default
+  - _self_
+
+# 运行模式配置
+mode: camera  # camera（带GUI） | video（带GUI）
+video_path: null  # 视频模式下的视频文件路径
+
+# 翻译配置（FG-CLIP支持中文，禁用翻译器）
+translation:
+  enabled: false  # FG-CLIP原生支持中文，无需翻译
+  api_key: null
+  model: gemini-2.5-flash
+  cache_enabled: false
+
+# Hydra输出目录配置
+hydra:
+  run:
+    dir: outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  job:
+    chdir: false  # 不改变工作目录
