@@ -16,12 +16,6 @@ DLC智能养老摄像头主程序
     
     # 视频文件模式
     python main.py mode=video video_path=assets/test_videos/fall_detection/test1.mp4
-    
-    # GUI模式
-    python main.py mode=gui
-    
-    # 自定义配置
-    python main.py mode=camera detection.scenarios.fall.threshold=0.3
 """
 
 import hydra

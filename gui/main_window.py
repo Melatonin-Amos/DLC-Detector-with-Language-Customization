@@ -465,7 +465,7 @@ class MainWindow:
         启动视频流
 
         流程：
-        1. OpenCV打开摄像头/RTSP流 (cv2.VideoCapture)
+        1. OpenCV打开摄像头(cv2.VideoCapture)
         2. 读取视频帧
         3. BGR → RGB 转换 (cv2.cvtColor)
         4. 转换为 PIL.Image → ImageTk.PhotoImage
