@@ -24,6 +24,7 @@ import numpy as np
 from PIL import Image
 
 from ..models.clip_wrapper import CLIPWrapper
+from ..utils.translator import ChineseTranslator
 
 logger = logging.getLogger(__name__)
 
@@ -31,17 +32,28 @@ logger = logging.getLogger(__name__)
 class ScenarioConfig:
     """场景配置类"""
     
-    def __init__(self, scenario_dict: dict):
+    def __init__(self, scenario_dict: dict, translator: Optional[ChineseTranslator] = None):
         """
         初始化场景配置
         
         Args:
             scenario_dict: 场景配置字典（从YAML加载）
+            translator: 中文翻译器（可选）
         """
         self.name = scenario_dict.get('name', '')
         self.enabled = scenario_dict.get('enabled', True)
-        self.prompts = scenario_dict.get('prompts', [])
-        self.negative_prompts = scenario_dict.get('negative_prompts', [])
+        
+        # 支持单个中文提示词
+        prompt_cn = scenario_dict.get('prompt_cn', '')
+        
+        # 如果有翻译器且配置了中文提示词，则翻译
+        if translator and prompt_cn:
+            self.prompt = translator.translate(prompt_cn)
+            logger.debug(f"场景 '{self.name}' 提示词已翻译: {prompt_cn} -> {self.prompt}")
+        else:
+            # 否则使用英文提示词（向后兼容）
+            self.prompt = scenario_dict.get('prompt', prompt_cn)
+        
         self.threshold = scenario_dict.get('threshold', 0.25)
         self.cooldown = scenario_dict.get('cooldown', 30)
         self.consecutive_frames = scenario_dict.get('consecutive_frames', 1)
@@ -64,15 +76,17 @@ class CLIPDetector:
                  clip_model: Optional[CLIPWrapper] = None,
                  config: Optional[Dict] = None,
                  model_name: str = "ViT-B/32",
-                 device: Optional[str] = None):
+                 device: Optional[str] = None,
+                 translator: Optional[ChineseTranslator] = None):
         """
         初始化CLIP检测器
         
         Args:
             clip_model: CLIP模型实例，如果为None则自动创建
-            config: 检测配置字典（从detection_config.yaml加载）
+            config: 完整配置字典（包含detection、model等）
             model_name: CLIP模型名称
             device: 设备
+            translator: 中文翻译器（可选）
         """
         # 初始化或使用已有的CLIP模型
         if clip_model is None:
@@ -82,20 +96,23 @@ class CLIPDetector:
             self.clip_model = clip_model
             logger.info("使用已有的CLIP模型")
         
+        self.translator = translator
+        
         # 解析场景配置
         self.scenarios = {}
         self.config = config or {}
         
-        if 'detection' in self.config and 'scenarios' in self.config['detection']:
-            for scenario_id, scenario_dict in self.config['detection']['scenarios'].items():
-                self.scenarios[scenario_id] = ScenarioConfig(scenario_dict)
-                logger.info(f"加载场景配置: {scenario_id} - {scenario_dict.get('name', '')}")
+        detection_config = self.config.get('detection', {})
+        scenarios_config = detection_config.get('scenarios', {})
+        
+        for scenario_id, scenario_dict in scenarios_config.items():
+            self.scenarios[scenario_id] = ScenarioConfig(scenario_dict, translator)
+            logger.info(f"加载场景配置: {scenario_id} - {scenario_dict.get('name', '')}")
         
         # 全局配置
-        global_config = self.config.get('detection', {}).get('global', {})
-        self.enabled = global_config.get('enabled', True)
-        self.show_results = global_config.get('show_results', True)
-        self.show_confidence = global_config.get('show_confidence', True)
+        self.enabled = detection_config.get('enabled', True)
+        self.show_results = detection_config.get('show_results', True)
+        self.show_confidence = detection_config.get('show_confidence', True)
         
         # 温度参数（从模型配置读取）
         model_config = self.config.get('model', {}).get('inference', {})
@@ -196,8 +213,6 @@ class CLIPDetector:
         """
         计算场景的置信度
         
-        使用对比方法：正样本相似度 - 负样本相似度
-        
         Args:
             image: 输入图像
             scenario: 场景配置
@@ -205,32 +220,17 @@ class CLIPDetector:
         Returns:
             置信度分数
         """
-        # 1. 计算正样本相似度（目标场景）
-        positive_scores = []
-        if scenario.prompts:
-            logits, _ = self.clip_model.predict(
-                image,
-                scenario.prompts,
-                temperature=self.temperature
-            )
-            positive_scores = logits.cpu().tolist()
+        # 计算单个提示词的相似度
+        if not scenario.prompt:
+            return 0.0
         
-        # 取平均值作为正样本分数
-        positive_score = np.mean(positive_scores) if positive_scores else 0.0
+        logits, _ = self.clip_model.predict(
+            image,
+            [scenario.prompt],
+            temperature=self.temperature
+        )
         
-        # 2. 计算负样本相似度（正常场景）
-        negative_score = 0.0
-        if scenario.negative_prompts:
-            logits, _ = self.clip_model.predict(
-                image,
-                scenario.negative_prompts,
-                temperature=self.temperature
-            )
-            negative_scores = logits.cpu().tolist()
-            negative_score = np.mean(negative_scores)
-        
-        # 3. 对比分数：正样本分数 - 负样本分数
-        # 这样可以更好地区分异常和正常情况
+        return logits.cpu().item()
         confidence = positive_score - negative_score * 0.5  # 负样本权重较小
         
         return float(confidence)

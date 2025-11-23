@@ -1,0 +1,21 @@
+# @package _global_.alert
+# 默认警报配置
+
+# 控制台输出
+console:
+  enabled: true
+  use_color: true
+
+# 日志文件
+log:
+  enabled: true
+  level: INFO
+  file: data/logs/alert.log
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# 保存警报帧
+save_frame:
+  enabled: true
+  path: data/outputs/alerts
+  format: jpg
+  add_annotation: true  # 在图像上标注检测信息

@@ -19,6 +19,7 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+test*.py
 
 # Virtual Environment
 venv/
@@ -63,7 +64,19 @@ desktop.ini
 *.tmp
 *.bak
 *.cache
-test_*.py
+
 # 环境变量
 .env
 .env.local
+.env.example
+
+# Hydra输出
+outputs/
+multirun/
+
+# 翻译缓存
+data/.translation_cache.json
+
+# 警报输出
+data/outputs/alerts/
+data/logs/

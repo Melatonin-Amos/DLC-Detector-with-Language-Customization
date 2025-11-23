@@ -40,9 +40,21 @@ class MainWindow:
         # 创建主窗口
         self.root = tk.Tk()
         self.root.title("主窗口 - 实时视频")
-        # 系统默认字体
-        system_font = font.nametofont("TkDefaultFont")
-        self.root.option_add("*Font", system_font)
+        # 配置中文字体支持
+        import platform
+        if platform.system() == "Linux":
+            try:
+                # Linux字体优先级
+                for font_family in ["Noto Sans CJK SC", "WenQuanYi Micro Hei", "DejaVu Sans", "Liberation Sans"]:
+                    test_font = font.Font(family=font_family, size=10)
+                    self.root.option_add("*Font", (font_family, 10))
+                    break
+            except:
+                pass
+        elif platform.system() == "Windows":
+            self.root.option_add("*Font", ("Microsoft YaHei", 10))
+        elif platform.system() == "Darwin":
+            self.root.option_add("*Font", ("PingFang SC", 10))
         # 获取屏幕尺寸
         self.screen_width = self.root.winfo_screenwidth()
         self.screen_height = self.root.winfo_screenheight()
@@ -81,7 +93,7 @@ class MainWindow:
                 "auto_record": False,
             },
             # 场景类型列表
-            "scene_types": ["摔倒", "起火"],
+            "scene_types": ["摔倒", "起火", "正常"],
         }
 
         # 初始化视频流相关变量
@@ -675,6 +687,18 @@ class MainWindow:
             self.root.destroy()
         finally:
             sys.exit(0)
+    
+    def set_video_stream(self, video_stream):
+        """设置视频流（从main.py传入）"""
+        self.video_stream = video_stream
+    
+    def set_detector(self, detector):
+        """设置检测器（从main.py传入）"""
+        self.detector = detector
+    
+    def set_alert_manager(self, alert_manager):
+        """设置警报管理器（从main.py传入）"""
+        self.alert_manager = alert_manager
 
     def run(self) -> None:
         """运行主窗口"""
