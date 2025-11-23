@@ -1,7 +1,7 @@
 # @package _global_.camera
 # 默认摄像头配置
 
-# 摄像头索引（0=主摄像头, 2=备用摄像头）
+# 摄像头索引
 index: 0
 
 # 2K分辨率设置
@@ -9,7 +9,7 @@ width: 1920
 height: 1080
 
 # 抽帧配置
-extract_interval: 0.5  # 每0.5秒抽取一帧
+extract_interval: 1  # 每1秒抽取一帧
 
 # 视频编码
 codec: mp4v

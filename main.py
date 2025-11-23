@@ -16,12 +16,6 @@ DLC智能养老摄像头主程序
     
     # 视频文件模式
     python main.py mode=video video_path=assets/test_videos/fall_detection/test1.mp4
-    
-    # GUI模式
-    python main.py mode=gui
-    
-    # 自定义配置
-    python main.py mode=camera detection.scenarios.fall.threshold=0.3
 """
 
 import hydra
@@ -123,7 +117,8 @@ class DLCApplication:
         try:
             from gui.main_window import MainWindow
             
-            # 打开摄像头
+            # 打开摄像头（使用配置的索引）
+            logger.info(f"正在打开摄像头索引 {self.cfg.camera.index}...")
             self.video_stream.open_camera()
             
             # 启动GUI
@@ -256,7 +251,7 @@ def main(cfg: DictConfig):
             app.run_gui_mode()
         else:
             logger.error(f"❌ 未知的运行模式: {mode}")
-            logger.info("支持的模式: camera | video | gui")
+            logger.info("支持的模式: camera | video")
             sys.exit(1)
     
     except Exception as e:

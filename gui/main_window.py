@@ -43,18 +43,16 @@ class MainWindow:
         # 配置中文字体支持
         import platform
         if platform.system() == "Linux":
-            try:
-                # Linux字体优先级
-                for font_family in ["Noto Sans CJK SC", "WenQuanYi Micro Hei", "DejaVu Sans", "Liberation Sans"]:
-                    test_font = font.Font(family=font_family, size=10)
-                    self.root.option_add("*Font", (font_family, 10))
-                    break
-            except:
-                pass
+            # Linux使用Noto Sans CJK（系统已安装）
+            self.default_font = ("Noto Sans CJK SC", 10)
+            self.root.option_add("*Font", self.default_font)
+            print(f"✓ 使用字体: {self.default_font[0]}")
         elif platform.system() == "Windows":
-            self.root.option_add("*Font", ("Microsoft YaHei", 10))
+            self.default_font = ("Microsoft YaHei", 10)
+            self.root.option_add("*Font", self.default_font)
         elif platform.system() == "Darwin":
-            self.root.option_add("*Font", ("PingFang SC", 10))
+            self.default_font = ("PingFang SC", 10)
+            self.root.option_add("*Font", self.default_font)
         # 获取屏幕尺寸
         self.screen_width = self.root.winfo_screenwidth()
         self.screen_height = self.root.winfo_screenheight()
@@ -98,6 +96,11 @@ class MainWindow:
 
         # 初始化视频流相关变量
         self.video_capture: Optional[cv2.VideoCapture] = None
+        self.video_stream = None  # 从main.py传入的VideoStream
+        self.detector = None  # 从main.py传入的CLIPDetector
+        self.alert_manager = None  # 从main.py传入的AlertManager
+        self.extract_interval = 1.0  # 抽帧间隔（秒）
+        self.last_detect_time = 0  # 上次检测时间
         self.is_playing: bool = False
         self.is_paused: bool = False
         self.update_id: Optional[str] = None  # 用于存储after的返回ID
@@ -465,29 +468,31 @@ class MainWindow:
         启动视频流
 
         流程：
-        1. OpenCV打开摄像头/RTSP流 (cv2.VideoCapture)
+        1. 使用已打开的video_stream或OpenCV打开摄像头
         2. 读取视频帧
         3. BGR → RGB 转换 (cv2.cvtColor)
         4. 转换为 PIL.Image → ImageTk.PhotoImage
         5. Tkinter Canvas 显示图像
         """
         try:
-            # 释放之前的视频捕获对象
-            if self.video_capture is not None:
-                self.video_capture.release()
+            # 如果有传入的video_stream，直接使用
+            if hasattr(self, 'video_stream') and self.video_stream and self.video_stream.cap:
+                print("使用已打开的video_stream...")
+                self.video_capture = self.video_stream.cap
+            else:
+                # 释放之前的视频捕获对象
+                if self.video_capture is not None:
+                    self.video_capture.release()
 
-            # 仅支持本地摄像头（设备ID 0）
-            print("正在打开本地摄像头...")
-            self.video_capture = cv2.VideoCapture(0)  # 0 表示默认摄像头
-
-            # 设置缓冲区大小，减少延迟
-            self.video_capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+                # 本地摄像头
+                print("正在打开本地摄像头...")
+                self.video_capture = cv2.VideoCapture(0)
+                self.video_capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
             # 检查是否成功打开
-            if not self.video_capture.isOpened():
-                source_type = "摄像头" if self.rtsp_url == "0" else "RTSP流"
+            if not self.video_capture or not self.video_capture.isOpened():
                 messagebox.showerror(
-                    "错误", f"无法连接到{source_type}:\n{self.rtsp_url}"
+                    "错误", "无法打开摄像头，请检查摄像头连接"
                 )
                 self.video_capture = None
                 return
@@ -587,6 +592,24 @@ class MainWindow:
                     # ========== 步骤2: BGR → RGB 转换 ==========
                     # OpenCV默认使用BGR格式，需要转换为RGB供PIL使用
                     frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    
+                    # ========== 执行CLIP检测（按照extract_interval控制频率） ==========
+                    if hasattr(self, 'detector') and self.detector:
+                        import time
+                        current_time = time.time()
+                        
+                        # 检查是否到达检测间隔
+                        if current_time - self.last_detect_time >= self.extract_interval:
+                            self.last_detect_time = current_time
+                            try:
+                                result = self.detector.detect(frame_rgb, current_time)
+                                if result.get('detected', False):
+                                    print(f"⚠️  检测到: {result['scenario_name']} (置信度: {result['confidence']:.2%})")
+                                    # 调用警报管理器
+                                    if hasattr(self, 'alert_manager') and self.alert_manager:
+                                        self.alert_manager.trigger_alert(result, frame_rgb)
+                            except Exception as e:
+                                print(f"检测错误: {e}")
 
                     # 获取画布尺寸
                     canvas_width = self.video_canvas.winfo_width()
@@ -691,6 +714,10 @@ class MainWindow:
     def set_video_stream(self, video_stream):
         """设置视频流（从main.py传入）"""
         self.video_stream = video_stream
+        # 设置抽帧间隔
+        if video_stream and hasattr(video_stream, 'extract_interval'):
+            self.extract_interval = video_stream.extract_interval
+            print(f"✓ 设置检测间隔: {self.extract_interval}秒/帧")
     
     def set_detector(self, detector):
         """设置检测器（从main.py传入）"""

@@ -12,25 +12,25 @@ scenarios:
     enabled: true
     name: 跌倒检测
     prompt_cn: 老人摔倒在地上
-    threshold: 0.25
+    threshold: 0.34
     cooldown: 30
-    consecutive_frames: 3
+    consecutive_frames: 2
     alert_level: high
   
   fire:
     enabled: true
     name: 火灾检测
     prompt_cn: 房间里着火了
-    threshold: 0.30
+    threshold: 0.34
     cooldown: 60
-    consecutive_frames: 5
+    consecutive_frames: 3
     alert_level: high
   
   normal:
-    enabled: false
+    enabled: true
     name: 正常场景
     prompt_cn: 正常的日常生活
-    threshold: 0.20
+    threshold: 0.60
     cooldown: 10
     consecutive_frames: 1
     alert_level: low
