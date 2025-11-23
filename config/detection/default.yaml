@@ -1,0 +1,36 @@
+# @package _global_.detection
+# 默认检测配置
+
+# 全局开关
+enabled: true
+show_results: true
+show_confidence: true
+
+# 场景配置
+scenarios:
+  fall:
+    enabled: true
+    name: 跌倒检测
+    prompt_cn: 老人摔倒在地上
+    threshold: 0.25
+    cooldown: 30
+    consecutive_frames: 3
+    alert_level: high
+  
+  fire:
+    enabled: true
+    name: 火灾检测
+    prompt_cn: 房间里着火了
+    threshold: 0.30
+    cooldown: 60
+    consecutive_frames: 5
+    alert_level: high
+  
+  normal:
+    enabled: false
+    name: 正常场景
+    prompt_cn: 正常的日常生活
+    threshold: 0.20
+    cooldown: 10
+    consecutive_frames: 1
+    alert_level: low

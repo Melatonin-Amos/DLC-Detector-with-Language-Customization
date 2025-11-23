@@ -1,0 +1,11 @@
+# @package _global_.model
+# ViT-B/32 模型配置
+
+name: ViT-B/32
+device: auto  # auto | cpu | cuda
+
+# 推理配置
+inference:
+  batch_size: 1
+  temperature: 1.0
+  use_fp16: false

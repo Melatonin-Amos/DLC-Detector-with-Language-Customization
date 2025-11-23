@@ -1,0 +1,27 @@
+# DLC主配置文件
+# 使用Hydra进行配置管理
+
+defaults:
+  - camera: default
+  - detection: default
+  - model: vit_b_32
+  - alert: default
+  - _self_
+
+# 运行模式配置
+mode: camera  # camera（带GUI） | video（带GUI）
+video_path: null  # 视频模式下的视频文件路径
+
+# 翻译配置（中文提示词转英文）
+translation:
+  enabled: true
+  api_key: ${oc.env:GEMINI_API_KEY,null}  # 从环境变量读取
+  model: gemini-2.5-flash
+  cache_enabled: true  # 缓存已翻译的文本
+
+# Hydra输出目录配置
+hydra:
+  run:
+    dir: outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  job:
+    chdir: false  # 不改变工作目录
