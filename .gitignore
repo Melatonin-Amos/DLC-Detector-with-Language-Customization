@@ -65,7 +65,7 @@ desktop.ini
 *.tmp
 *.bak
 *.cache
-
+test_*.py
 # 环境变量
 .env
 .env.local
