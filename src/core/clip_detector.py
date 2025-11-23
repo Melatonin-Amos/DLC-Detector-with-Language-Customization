@@ -153,19 +153,43 @@ class CLIPDetector:
             logger.warning("没有启用的检测场景")
             return {'detected': False}
         
+        logger.debug(f"检测图像，活跃场景数: {len(active_scenarios)}")
+        
+        # 一次性计算所有场景的置信度（使用softmax）
+        all_prompts = [s.prompt for s in active_scenarios.values() if s.prompt]
+        prompt_to_scenario = {s.prompt: sid for sid, s in active_scenarios.items() if s.prompt}
+        
+        if not all_prompts:
+            return {'detected': False}
+        
+        # 使用CLIP计算所有提示词的相似度
+        logits, _ = self.clip_model.predict(image, all_prompts, temperature=self.temperature)
+        
+        # 应用softmax归一化
+        import torch.nn.functional as F
+        probs = F.softmax(logits, dim=0)
+        
+        logger.debug(f"原始CLIP分数: {[f'{l:.4f}' for l in logits.tolist()]}")
+        logger.debug(f"Softmax概率: {[f'{p:.4f}' for p in probs.tolist()]}")
+        
         # 检测每个场景
         all_results = {}
         max_confidence = 0
         detected_scenario = None
         
-        for scenario_id, scenario in active_scenarios.items():
+        for idx, (prompt, scenario_id) in enumerate(prompt_to_scenario.items()):
+            scenario = active_scenarios[scenario_id]
+            
             # 检查冷却时间
             if current_time - scenario.last_trigger_time < scenario.cooldown:
+                logger.debug(f"场景 '{scenario.name}' 冷却中，跳过")
                 continue
             
-            # 计算场景置信度
-            confidence = self._compute_scenario_confidence(image, scenario)
+            # 从预计算的softmax结果中获取置信度
+            confidence = probs[idx].cpu().item()
             all_results[scenario_id] = confidence
+            
+            logger.info(f"场景 '{scenario.name}': {confidence:.4f} (阈值: {scenario.threshold})")
             
             # 更新历史记录
             scenario.history.append(confidence)
@@ -211,29 +235,53 @@ class CLIPDetector:
                                     image: Union[Image.Image, np.ndarray],
                                     scenario: ScenarioConfig) -> float:
         """
-        计算场景的置信度
+        计算场景的置信度（使用softmax归一化）
         
         Args:
             image: 输入图像
             scenario: 场景配置
         
         Returns:
-            置信度分数
+            置信度分数（0-1之间）
         """
         # 计算单个提示词的相似度
         if not scenario.prompt:
             return 0.0
         
+        # 收集所有场景的提示词进行对比
+        all_prompts = [s.prompt for s in self.scenarios.values() if s.enabled and s.prompt]
+        
+        if len(all_prompts) <= 1:
+            # 只有一个场景，直接返回原始相似度
+            logits, _ = self.clip_model.predict(
+                image,
+                [scenario.prompt],
+                temperature=self.temperature
+            )
+            score = logits.cpu().item()
+            logger.debug(f"场景 '{scenario.name}' 原始分数: {score:.4f}")
+            return score
+        
+        # 多场景：使用softmax归一化
         logits, _ = self.clip_model.predict(
             image,
-            [scenario.prompt],
+            all_prompts,
             temperature=self.temperature
         )
         
-        return logits.cpu().item()
-        confidence = positive_score - negative_score * 0.5  # 负样本权重较小
+        # 应用softmax
+        import torch.nn.functional as F
+        probs = F.softmax(logits, dim=0)
         
-        return float(confidence)
+        # 找到当前场景的索引
+        try:
+            idx = all_prompts.index(scenario.prompt)
+            confidence = probs[idx].cpu().item()
+            logger.debug(f"场景 '{scenario.name}' softmax分数: {confidence:.4f} (原始: {logits[idx].item():.4f})")
+            return confidence
+        except ValueError:
+            return 0.0
+
     
     def batch_detect(self,
                     images: List[Union[Image.Image, np.ndarray]],

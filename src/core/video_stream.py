@@ -46,20 +46,27 @@ class VideoStream:
     
     def open_camera(self):
         """打开摄像头"""
-        logger.info(f"打开摄像头 (索引: {self.camera_index})")
+        logger.info(f"尝试打开摄像头索引: {self.camera_index}")
         
         self.cap = cv2.VideoCapture(self.camera_index)
         
         if not self.cap.isOpened():
             raise RuntimeError(
-                f"无法打开摄像头 {self.camera_index}\n"
-                f"请检查摄像头是否连接且未被占用"
+                f"无法打开摄像头索引 {self.camera_index}\n"
+                f"请尝试其他索引值（0, 2, 4等）"
             )
         
         # 设置分辨率
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
         self.cap.set(cv2.CAP_PROP_FPS, 30)
+        
+        # 获取实际参数
+        actual_width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        actual_height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        self.fps = self.cap.get(cv2.CAP_PROP_FPS) or 30.0
+        
+        logger.info(f"✅ 摄像头已打开: 索引{self.camera_index}, {actual_width}x{actual_height} @ {self.fps:.1f}fps")
         
         # 获取实际参数
         actual_width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))

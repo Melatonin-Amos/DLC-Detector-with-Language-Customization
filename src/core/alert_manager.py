@@ -143,40 +143,45 @@ class AlertManager:
         logger.info(f"警报帧已保存: {filepath}")
     
     def _annotate_frame(self, frame: np.ndarray, alert_info: Dict) -> np.ndarray:
-        """在帧上标注警报信息"""
-        annotated = frame.copy()
+        """在帧上标注警报信息（使用PIL支持中文）"""
+        from PIL import Image, ImageDraw, ImageFont
         
-        # RGB转BGR进行标注
-        annotated_bgr = cv2.cvtColor(annotated, cv2.COLOR_RGB2BGR)
+        # 转换为PIL图像
+        pil_img = Image.fromarray(frame)
+        draw = ImageDraw.Draw(pil_img)
         
-        # 添加文本标注
-        text = f"{alert_info['scenario_name']} - {alert_info['confidence']:.3f}"
+        # 加载中文字体
+        try:
+            font = ImageFont.truetype("/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc", 40)
+        except:
+            try:
+                font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 40)
+            except:
+                font = ImageFont.load_default()
+        
+        # 准备文本
+        text = f"{alert_info['scenario_name']} - {alert_info['confidence']:.1%}"
         
         # 设置颜色（根据级别）
         color_map = {
-            'high': (0, 0, 255),      # 红色
-            'medium': (0, 165, 255),  # 橙色
-            'low': (0, 255, 255)      # 黄色
+            'high': (255, 0, 0),      # 红色
+            'medium': (255, 165, 0),  # 橙色
+            'low': (255, 255, 0)      # 黄色
         }
         color = color_map.get(alert_info['alert_level'], (0, 255, 0))
         
-        # 绘制文本
-        cv2.putText(
-            annotated_bgr,
-            text,
-            (50, 50),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            1.5,
-            color,
-            3
-        )
+        # 绘制文本（带黑色描边）
+        x, y = 50, 50
+        for offset in [(-2,-2), (-2,2), (2,-2), (2,2)]:
+            draw.text((x+offset[0], y+offset[1]), text, font=font, fill=(0, 0, 0))
+        draw.text((x, y), text, font=font, fill=color)
         
         # 绘制边框
-        h, w = annotated_bgr.shape[:2]
-        cv2.rectangle(annotated_bgr, (10, 10), (w-10, h-10), color, 5)
+        w, h = pil_img.size
+        draw.rectangle([(10, 10), (w-10, h-10)], outline=color, width=5)
         
-        # BGR转回RGB
-        return cv2.cvtColor(annotated_bgr, cv2.COLOR_BGR2RGB)
+        # 转回numpy数组
+        return np.array(pil_img)
     
     def get_statistics(self) -> Dict:
         """获取警报统计信息"""

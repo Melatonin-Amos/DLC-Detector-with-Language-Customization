@@ -117,7 +117,8 @@ class DLCApplication:
         try:
             from gui.main_window import MainWindow
             
-            # 打开摄像头
+            # 打开摄像头（使用配置的索引）
+            logger.info(f"正在打开摄像头索引 {self.cfg.camera.index}...")
             self.video_stream.open_camera()
             
             # 启动GUI
@@ -250,7 +251,7 @@ def main(cfg: DictConfig):
             app.run_gui_mode()
         else:
             logger.error(f"❌ 未知的运行模式: {mode}")
-            logger.info("支持的模式: camera | video | gui")
+            logger.info("支持的模式: camera | video")
             sys.exit(1)
     
     except Exception as e:
