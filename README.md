@@ -1,10 +1,14 @@
 # DLC-Detector-with-Language-Customization
 
-这是上海交通大学电子信息与电气工程学部（中的计算机学院、自动化与感知学院）的一群大学一年级学生在 [工程学导论（ME1221）](https://oc.sjtu.edu.cn/courses/84663) 课程项目的版本管理仓库，本项目旨在实现一个**基于CLIP的支持语义客制化的智能养老摄像头模块**的硬件支持性开发、后端VLM开发以及前端开发。技术上，我们使用大规模语义预训练的[CLIP](https://arxiv.org/abs/2103.00020)模型，采用ViT作为视觉编码器，Vanilla Transformer作为语义编码器，zero-shot地进行场景识别，从而实现高度个性化的智能功能。
+这是上海交通大学电子信息与电气工程学部（中的计算机学院、自动化与感知学院）的一群大学一年级学生在 [工程学导论（ME1221）](https://oc.sjtu.edu.cn/courses/84663) 课程项目的版本管理仓库，本项目旨在实现一个**基于CLIPs的支持语义客制化的智能养老摄像头模块**的硬件支持性开发、后端VLM开发以及前端开发。技术上，我们使用大规模语义预训练的[CLIP](https://arxiv.org/abs/2103.00020)模型，采用ViT作为视觉编码器，Vanilla Transformer作为语义编码器，进行了zero-shot地进行场景识别，从而实现高度个性化的智能功能。此外，我们使用了SoTA的VLM模型[FG-CLIP 2](https://360cvgroup.github.io/FG-CLIP/)便于在更高难度、算力资源更加充足的非边缘计算情境下应用我们的DLC，我们强烈推荐您在资源不受限的情况下使用**FG-CLIP 2**。
 
-**最新更新**: 现已支持 **FG-CLIP 2** 模型！FG-CLIP 2是360CVGroup开发的中英双语视觉语言对齐模型，相比原CLIP在摔倒检测等场景中有更高的灵敏度，且原生支持中文无需翻译。详见 [FG-CLIP集成指南](docs/FG_CLIP_GUIDE.md)。
 
-![DLC全栈技术流程图](./doc_asset/image/DLCupd.png)
+
+![DLC全栈技术流程图](doc_asset/image/DLCupd.png)
+
+FG-CLIP 2使用了优化的模型架构和更大的参数量达成更高的准确率：
+
+![FG-CLIP2 架构图](doc_asset/image/framework.png)
 
 ***
 
@@ -44,37 +48,14 @@ pip install -r requirements.txt
 # 输入模式一：使用摄像头检测实时视频流中的关键帧（使用原CLIP模型）
 python main.py mode=camera camera.index=0 # 也有可能为1/2，请您进行尝试
 
-# 输入模式二：使用FG-CLIP 2模型（更高精度，支持中文）
-python main.py --config-name=config_fgclip mode=camera camera.index=0
-
-# 输入模式三：使用既有的检测视频/摄像头视频，检测其中的关键帧
+# 输入模式二：使用既有的检测视频/摄像头视频，检测其中的关键帧
 python main.py mode=video video_path=<your_video_path> 
 ```
 
-## 模型选择
+若您需要使用FG-CLIP 2模型，可以使用argparse加入`--config-name=config_fgclip`，其他操作同上，如：
 
-本项目支持两种视觉语言模型：
-
-### 1. CLIP (OpenAI)
-- 使用 `ViT-B/32` 模型
-- 需要翻译器将中文提示词转换为英文
-- 推理速度快，显存占用低（~2GB）
-- 适合资源受限场景
-
-### 2. FG-CLIP 2 (360CVGroup) ⭐ 推荐
-- 中英双语支持，无需翻译器
-- 摔倒检测灵敏度更高
-- 支持更长的文本描述（196 tokens vs 77 tokens）
-- 动态分辨率处理
-- 需要 transformers 库，显存占用较高（~4GB）
-
-**切换到FG-CLIP 2:**
 ```bash
-# 使用FG-CLIP配置
-python main.py --config-name=config_fgclip mode=camera
-
-# 或临时切换模型
-python main.py mode=camera model=fgclip2
+python main.py --config-name=config_fgclip mode=camera camera.index=2
 ```
 
 详细对比和使用说明请参考 [FG-CLIP集成指南](docs/FG_CLIP_GUIDE.md)。
