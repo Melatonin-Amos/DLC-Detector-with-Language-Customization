@@ -41,18 +41,12 @@ class MainWindow:
         self.root = tk.Tk()
         self.root.title("主窗口 - 实时视频")
         # 配置中文字体支持
-        import platform
-        if platform.system() == "Linux":
-            # Linux使用Noto Sans CJK（系统已安装）
-            self.default_font = ("Noto Sans CJK SC", 10)
+        self.default_font = self._find_chinese_font()
+        if self.default_font:
             self.root.option_add("*Font", self.default_font)
             print(f"✓ 使用字体: {self.default_font[0]}")
-        elif platform.system() == "Windows":
-            self.default_font = ("Microsoft YaHei", 10)
-            self.root.option_add("*Font", self.default_font)
-        elif platform.system() == "Darwin":
-            self.default_font = ("PingFang SC", 10)
-            self.root.option_add("*Font", self.default_font)
+        else:
+            print("⚠️ 未找到中文字体，使用默认字体")
         # 获取屏幕尺寸
         self.screen_width = self.root.winfo_screenwidth()
         self.screen_height = self.root.winfo_screenheight()
@@ -116,6 +110,53 @@ class MainWindow:
         # 确保初始几何形状（after_idle是时序控制，所有待处理事件都执行完毕后才会调用_ensure_initial_geometry)
         self.root.after_idle(self._ensure_initial_geometry)
 
+    def _find_chinese_font(self) -> Optional[tuple]:
+        """智能查找系统可用的中文字体"""
+        import platform
+        import subprocess
+        
+        system = platform.system()
+        
+        # 按优先级排列的字体列表
+        linux_fonts = [
+            "Noto Sans CJK SC", "Noto Sans CJK TC", "Noto Sans CJK JP",
+            "WenQuanYi Micro Hei", "WenQuanYi Zen Hei",
+            "AR PL UMing CN", "AR PL UKai CN",
+            "Droid Sans Fallback", "Source Han Sans CN"
+        ]
+        windows_fonts = ["Microsoft YaHei", "SimHei", "SimSun", "NSimSun"]
+        mac_fonts = ["PingFang SC", "Heiti SC", "STHeiti", "Hiragino Sans GB"]
+        
+        if system == "Linux":
+            # 使用fc-list查询实际可用的字体
+            try:
+                result = subprocess.run(
+                    ["fc-list", ":lang=zh", "-f", "%{family}\n"],
+                    capture_output=True, text=True, timeout=5
+                )
+                available = set(result.stdout.strip().split("\n"))
+                for font in linux_fonts:
+                    if font in available or any(font in f for f in available):
+                        return (font, 10)
+            except:
+                pass
+            # 回退到直接尝试
+            for font in linux_fonts:
+                try:
+                    from tkinter import font as tkfont
+                    if font in tkfont.families():
+                        return (font, 10)
+                except:
+                    continue
+        elif system == "Windows":
+            for font in windows_fonts:
+                return (font, 10)
+        elif system == "Darwin":
+            for font in mac_fonts:
+                return (font, 10)
+        
+        return None
+    
     def _setup_window(self) -> None:
         """配置窗口基本属性"""
         # 计算居中位置

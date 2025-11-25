@@ -1,0 +1,133 @@
+# @package _global_.detection
+# 居家养老场景扩展配置
+# 针对老年人居家安全的多种检测情境
+# 经测试: 英文描述性prompt效果更好，中文用于界面显示
+
+enabled: true
+show_results: true
+show_confidence: true
+
+scenarios:
+  # ===== 紧急危险类（高优先级）=====
+  fall:
+    enabled: true
+    name: 跌倒检测
+    prompt: a person has fallen and is lying on the floor
+    prompt_cn: 有人摔倒躺在地上
+    threshold: 0.35
+    cooldown: 30
+    consecutive_frames: 2
+    alert_level: high
+  
+  fire:
+    enabled: true
+    name: 火灾检测
+    prompt: flames and fire burning with visible smoke
+    prompt_cn: 发生火灾，有火焰和浓烟
+    threshold: 0.38
+    cooldown: 60
+    consecutive_frames: 3
+    alert_level: high
+  
+  smoke:
+    enabled: true
+    name: 烟雾检测
+    prompt: thick smoke filling the indoor room
+    prompt_cn: 室内有大量烟雾
+    threshold: 0.36
+    cooldown: 45
+    consecutive_frames: 2
+    alert_level: high
+
+  # ===== 行为异常类（中优先级）=====
+  lying_floor:
+    enabled: true
+    name: 长时间躺地
+    prompt: a person lying motionless on the floor
+    prompt_cn: 有人躺在地板上一动不动
+    threshold: 0.36
+    cooldown: 120
+    consecutive_frames: 5
+    alert_level: high
+  
+  struggle:
+    enabled: true
+    name: 挣扎求助
+    prompt: a person struggling and reaching for help on the ground
+    prompt_cn: 有人在地上挣扎求助
+    threshold: 0.34
+    cooldown: 30
+    consecutive_frames: 2
+    alert_level: high
+
+  stumble:
+    enabled: true
+    name: 踉跄不稳
+    prompt: a person stumbling and about to fall
+    prompt_cn: 有人走路不稳快要摔倒
+    threshold: 0.32
+    cooldown: 20
+    consecutive_frames: 2
+    alert_level: medium
+
+  # ===== 环境异常类（中优先级）=====
+  water_leak:
+    enabled: true
+    name: 漏水积水
+    prompt: water puddle on the floor
+    prompt_cn: 地板上有积水
+    threshold: 0.36
+    cooldown: 60
+    consecutive_frames: 3
+    alert_level: medium
+
+  gas_stove:
+    enabled: true
+    name: 燃气灶开火
+    prompt: gas stove with flame burning in the kitchen
+    prompt_cn: 厨房燃气灶正在使用
+    threshold: 0.38
+    cooldown: 180
+    consecutive_frames: 3
+    alert_level: medium
+
+  broken_glass:
+    enabled: true
+    name: 玻璃破碎
+    prompt: broken glass scattered on the floor
+    prompt_cn: 地上有破碎玻璃
+    threshold: 0.34
+    cooldown: 60
+    consecutive_frames: 2
+    alert_level: medium
+
+  # ===== 日常状态类（低优先级/参照）=====
+  sitting:
+    enabled: true
+    name: 静坐休息
+    prompt: a person sitting on a chair
+    prompt_cn: 有人坐在椅子上
+    threshold: 0.30
+    cooldown: 10
+    consecutive_frames: 1
+    alert_level: low
+
+  walking:
+    enabled: true
+    name: 正常行走
+    prompt: a person walking indoors
+    prompt_cn: 有人在室内走动
+    threshold: 0.30
+    cooldown: 10
+    consecutive_frames: 1
+    alert_level: low
+
+  normal:
+    enabled: true
+    name: 正常场景
+    prompt: an ordinary indoor room with no emergency
+    prompt_cn: 普通室内环境，无异常
+    threshold: 0.28
+    cooldown: 10
+    consecutive_frames: 1
+    alert_level: low
