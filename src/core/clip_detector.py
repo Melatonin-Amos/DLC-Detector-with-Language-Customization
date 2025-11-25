@@ -43,20 +43,30 @@ class ScenarioConfig:
         self.name = scenario_dict.get('name', '')
         self.enabled = scenario_dict.get('enabled', True)
         
-        # 支持单个中文提示词
+        # 优先级: prompt(英文) > prompt_cn(中文) 
+        # 测试发现: FG-CLIP对英文描述性prompt效果更好
+        prompt_en = scenario_dict.get('prompt', '')
         prompt_cn = scenario_dict.get('prompt_cn', '')
         
-        # 如果有翻译器且配置了中文提示词，则翻译为英文（CLIP需要）
-        if translator and prompt_cn:
+        if prompt_en:
+            # 有英文prompt，优先使用（效果更好）
+            self.prompt = prompt_en
+            self.prompt_display = prompt_cn if prompt_cn else prompt_en  # 界面显示用中文
+            logger.debug(f"场景 '{self.name}' 使用英文提示词: {prompt_en}")
+        elif translator and prompt_cn:
+            # 没有英文prompt，有翻译器，翻译中文
             self.prompt = translator.translate(prompt_cn)
+            self.prompt_display = prompt_cn
             logger.debug(f"场景 '{self.name}' 提示词已翻译: {prompt_cn} -> {self.prompt}")
         elif prompt_cn:
-            # 无翻译器（FG-CLIP支持中文），直接使用中文提示词
+            # 没有英文也没有翻译器，使用中文
             self.prompt = prompt_cn
+            self.prompt_display = prompt_cn
             logger.debug(f"场景 '{self.name}' 使用中文提示词: {prompt_cn}")
         else:
-            # 向后兼容：使用英文提示词
-            self.prompt = scenario_dict.get('prompt', '')
+            self.prompt = ''
+            self.prompt_display = ''
+            logger.warning(f"场景 '{self.name}' 没有配置提示词")
         
         self.threshold = scenario_dict.get('threshold', 0.25)
         self.cooldown = scenario_dict.get('cooldown', 30)
@@ -177,29 +187,33 @@ class CLIPDetector:
         
         logger.debug(f"检测图像，活跃场景数: {len(active_scenarios)}")
         
-        # 一次性计算所有场景的置信度（使用softmax）
-        all_prompts = [s.prompt for s in active_scenarios.values() if s.prompt]
-        prompt_to_scenario = {s.prompt: sid for sid, s in active_scenarios.items() if s.prompt}
+        # 收集所有prompt和对应的场景ID（保持顺序一致）
+        prompt_scenario_pairs = [
+            (s.prompt, sid) for sid, s in active_scenarios.items() if s.prompt
+        ]
+        all_prompts = [p[0] for p in prompt_scenario_pairs]
         
         if not all_prompts:
             return {'detected': False}
         
-        # 使用CLIP计算所有提示词的相似度
-        logits, _ = self.clip_model.predict(image, all_prompts, temperature=self.temperature)
+        # 使用VLM计算所有提示词的相似度
+        logits, probs = self.clip_model.predict(image, all_prompts, temperature=self.temperature)
         
-        # 应用softmax归一化
-        import torch.nn.functional as F
-        probs = F.softmax(logits, dim=0)
+        # 确保probs在CPU上
+        if hasattr(probs, 'cpu'):
+            probs = probs.cpu()
         
-        logger.debug(f"原始CLIP分数: {[f'{l:.4f}' for l in logits.tolist()]}")
+        logger.debug(f"VLM原始分数: {[f'{l:.4f}' for l in logits.tolist()]}")
         logger.debug(f"Softmax概率: {[f'{p:.4f}' for p in probs.tolist()]}")
         
-        # 检测每个场景
+        # 检测每个场景（保持索引与prompt_scenario_pairs一致）
         all_results = {}
-        max_confidence = 0
-        detected_scenario = None
+        candidates = []  # 候选场景列表：(priority, confidence, scenario_id)
         
-        for idx, (prompt, scenario_id) in enumerate(prompt_to_scenario.items()):
+        # alert_level优先级映射
+        alert_priority = {'high': 3, 'medium': 2, 'low': 1}
+        
+        for idx, (prompt, scenario_id) in enumerate(prompt_scenario_pairs):
             scenario = active_scenarios[scenario_id]
             
             # 检查冷却时间
@@ -207,8 +221,8 @@ class CLIPDetector:
                 logger.debug(f"场景 '{scenario.name}' 冷却中，跳过")
                 continue
             
-            # 从预计算的softmax结果中获取置信度
-            confidence = probs[idx].cpu().item()
+            # 获取该场景的置信度
+            confidence = probs[idx].item() if hasattr(probs[idx], 'item') else float(probs[idx])
             all_results[scenario_id] = confidence
             
             logger.info(f"场景 '{scenario.name}': {confidence:.4f} (阈值: {scenario.threshold})")
@@ -222,11 +236,19 @@ class CLIPDetector:
                 
                 # 检查连续帧条件
                 if scenario.consecutive_count >= scenario.consecutive_frames:
-                    if confidence > max_confidence:
-                        max_confidence = confidence
-                        detected_scenario = scenario_id
+                    # 添加到候选列表，记录优先级和置信度
+                    priority = alert_priority.get(scenario.alert_level, 1)
+                    candidates.append((priority, confidence, scenario_id))
             else:
                 scenario.consecutive_count = 0
+        
+        # 选择优先级最高且置信度最高的场景
+        detected_scenario = None
+        max_confidence = 0
+        if candidates:
+            # 按(优先级降序, 置信度降序)排序
+            candidates.sort(key=lambda x: (x[0], x[1]), reverse=True)
+            max_priority, max_confidence, detected_scenario = candidates[0]
         
         # 构建检测结果
         if detected_scenario is not None:

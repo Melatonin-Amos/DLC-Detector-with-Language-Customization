@@ -145,19 +145,51 @@ class AlertManager:
     def _annotate_frame(self, frame: np.ndarray, alert_info: Dict) -> np.ndarray:
         """在帧上标注警报信息（使用PIL支持中文）"""
         from PIL import Image, ImageDraw, ImageFont
+        import subprocess
         
         # 转换为PIL图像
         pil_img = Image.fromarray(frame)
         draw = ImageDraw.Draw(pil_img)
         
-        # 加载中文字体
-        try:
-            font = ImageFont.truetype("/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc", 40)
-        except:
+        # 智能查找可用的中文字体
+        font = None
+        font_paths = [
+            # Noto Sans CJK系列
+            "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
+            "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+            "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+            # 文泉驿系列
+            "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+            "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
+            # AR PL系列
+            "/usr/share/fonts/truetype/arphic/uming.ttc",
+            "/usr/share/fonts/truetype/arphic/ukai.ttc",
+            # DejaVu备选
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        ]
+        
+        for font_path in font_paths:
             try:
-                font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 40)
+                font = ImageFont.truetype(font_path, 40)
+                break
             except:
-                font = ImageFont.load_default()
+                continue
+        
+        # 如果静态路径都失败，尝试使用fc-match动态查找
+        if font is None:
+            try:
+                result = subprocess.run(
+                    ["fc-match", "-f", "%{file}", ":lang=zh"],
+                    capture_output=True, text=True, timeout=3
+                )
+                if result.stdout.strip():
+                    font = ImageFont.truetype(result.stdout.strip(), 40)
+            except:
+                pass
+        
+        # 最终回退
+        if font is None:
+            font = ImageFont.load_default()
         
         # 准备文本
         text = f"{alert_info['scenario_name']} - {alert_info['confidence']:.1%}"

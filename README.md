@@ -1,76 +1,269 @@
 # DLC-Detector-with-Language-Customization
 
-这是上海交通大学电子信息与电气工程学部（中的计算机学院、自动化与感知学院）的一群大学一年级学生在 [工程学导论（ME1221）](https://oc.sjtu.edu.cn/courses/84663) 课程项目的版本管理仓库，本项目旨在实现一个**基于CLIPs的支持语义客制化的智能养老摄像头模块**的硬件支持性开发、后端VLM开发以及前端开发。技术上，我们使用大规模语义预训练的[CLIP](https://arxiv.org/abs/2103.00020)模型，采用ViT作为视觉编码器，Vanilla Transformer作为语义编码器，进行了zero-shot地进行场景识别，从而实现高度个性化的智能功能。此外，我们使用了SoTA的VLM模型[FG-CLIP 2](https://360cvgroup.github.io/FG-CLIP/)便于在更高难度、算力资源更加充足的非边缘计算情境下应用我们的DLC，我们强烈推荐您在资源不受限的情况下使用**FG-CLIP 2**。
+<p align="center">
+  <img src="doc_asset/image/DLCupd.png" alt="DLC全栈技术流程图" width="800"/>
+</p>
 
+<p align="center">
+  <a href="#快速开始">快速开始</a> •
+  <a href="#功能特性">功能特性</a> •
+  <a href="#项目结构">项目结构</a> •
+  <a href="#配置说明">配置说明</a> •
+  <a href="#开发指南">开发指南</a> •
+  <a href="#许可证">许可证</a>
+</p>
 
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.10+-blue.svg" alt="Python"/>
+  <img src="https://img.shields.io/badge/PyTorch-1.12+-orange.svg" alt="PyTorch"/>
+  <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License"/>
+</p>
 
-![DLC全栈技术流程图](doc_asset/image/DLCupd.png)
+---
 
-FG-CLIP 2使用了优化的模型架构和更大的参数量达成更高的准确率：
+这是上海交通大学电子信息与电气工程学部的一群大一学生在 [工程学导论（ME1221）](https://oc.sjtu.edu.cn/courses/84663) 课程中开发的项目。本项目实现了一个**基于 VLM 的支持语义定制的智能养老摄像头系统**，利用大规模预训练视觉语言模型进行 zero-shot 场景识别，实现高度个性化的智能监护功能。
 
-![FG-CLIP2 架构图](doc_asset/image/framework.png)
+## 功能特性
 
-***
+- 🎯 **Zero-shot 场景检测**：无需训练即可识别跌倒、火灾等紧急场景
+- 🌐 **中英双语支持**：支持中文 Prompt 配置，界面中文显示
+- ⚡ **双模型支持**：支持 [CLIP](https://arxiv.org/abs/2103.00020) 和 [FG-CLIP 2](https://360cvgroup.github.io/FG-CLIP/)
+- 🔧 **灵活配置**：基于 Hydra 的配置系统，支持场景自定义
+- 🖥️ **GUI 界面**：Tkinter 图形界面，实时预览与配置
+- 📹 **多输入源**：支持摄像头实时流和本地视频文件
+
+<p align="center">
+  <img src="doc_asset/image/framework.png" alt="FG-CLIP2 架构图" width="700"/>
+  <br/>
+  <em>FG-CLIP 2 模型架构（推荐在算力充足时使用）</em>
+</p>
 
 ## 快速开始
 
-您可以运行下面的一系列终端代码从而快速地进行环境配置。
+### 环境要求
 
-首先,请您fork本项目仓库后将项目clone到本地，然后在您期望的项目文件夹中打开终端：
+- Python 3.10+
+- CUDA 11.0+（推荐，CPU 模式较慢）
+- 4GB+ 显存（FG-CLIP 2）
+
+### 安装
 
 ```bash
-git clone <repo-url>
+# 克隆仓库
+git clone https://github.com/Melatonin-Amos/DLC-Detector-with-Language-Customization.git
 cd DLC-Detector-with-Language-Customization
-```
 
-接着，配置环境，我们推荐使用[conda](https://anaconda.org/anaconda/conda)进行环境的管理，您也可以使用虚拟环境。
-
-```bash
-# 方式一：利用conda创建新环境
+# 创建 conda 环境（推荐）
 conda create -n dlc python=3.10 -y
 conda activate dlc
 
-
-# 方式二：创建虚拟环境
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# venv\Scripts\activate  # Windows
-```
-接着，安装依赖：
-
-```bash
+# 安装依赖
 pip install -r requirements.txt
 
-# (Optional)设置Gemini API密钥（用于使用CLIP时的中文翻译）
-export GEMINI_API_KEY="your_api_key_here"
+# Linux 用户安装中文字体（GUI 显示需要）
+sudo apt-get install -y fonts-noto-cjk fonts-wqy-zenhei
 ```
 
-接着，就可以运行我们的项目。值得注意的是，首次运行时会下载CLIP权重文件，可能用时较长；此外，不同的系统在外置摄像头管理上稍有差别，您可以多次尝试不同的`camera.index`（通过argparse传参），从而找到合适您使用场景的摄像头。若您已经确定了所用的摄像头的`index`，可以在[配置文件](config/camera/default.yaml)中修改默认摄像头索引，修改后即可以简单地使用`python main.py mode=camera`运行项目程序。
+### 运行
 
 ```bash
-# 输入模式一：使用摄像头检测实时视频流中的关键帧（使用原CLIP模型）
-python main.py mode=camera camera.index=0 # 也有可能为1/2，请您进行尝试
+# 使用 FG-CLIP 2 模型（推荐）
+python main.py --config-name=config_fgclip mode=camera camera.index=0
 
-# 输入模式二：使用既有的检测视频/摄像头视频，检测其中的关键帧
-python main.py mode=video video_path=<your_video_path> 
+# 使用视频文件测试
+python main.py --config-name=config_fgclip mode=video video_path=assets/test_videos/fall_detection/fall1.mp4
+
+# 使用原版 CLIP 模型（需配置翻译 API）
+export GEMINI_API_KEY="your_api_key"
+python main.py mode=camera
 ```
 
-若您需要使用FG-CLIP 2模型，可以使用argparse加入`--config-name=config_fgclip`，其他操作同上，如：
+## 项目结构
+
+```
+DLC-Detector-with-Language-Customization/
+├── main.py                     # 程序入口
+├── requirements.txt            # 依赖列表
+│
+├── config/                     # Hydra 配置文件
+│   ├── config.yaml             # CLIP 模型主配置
+│   ├── config_fgclip.yaml      # FG-CLIP 2 模型主配置
+│   ├── camera/                 # 摄像头配置
+│   ├── model/                  # 模型参数配置
+│   ├── detection/              # 检测场景配置
+│   │   ├── default.yaml        # 默认场景（跌倒/火灾）
+│   │   ├── elderly_care.yaml   # 养老场景扩展
+│   │   └── minimal.yaml        # 精简场景
+│   └── alert/                  # 警报配置
+│
+├── src/                        # 核心源码
+│   ├── core/                   # 核心模块
+│   │   ├── clip_detector.py    # 场景检测器
+│   │   ├── video_stream.py     # 视频流处理
+│   │   └── alert_manager.py    # 警报管理
+│   ├── models/                 # 模型封装
+│   │   ├── clip_wrapper.py     # CLIP 模型封装
+│   │   └── fgclip_wrapper.py   # FG-CLIP 2 封装
+│   └── utils/                  # 工具模块
+│       ├── translator.py       # 中文翻译器
+│       ├── config_loader.py    # 配置加载
+│       └── logger.py           # 日志工具
+│
+├── gui/                        # GUI 模块
+│   ├── main_window.py          # 主窗口
+│   └── settings_panel.py       # 设置面板
+│
+├── assets/                     # 资源文件
+│   └── test_videos/            # 测试视频
+│
+├── docs/                       # 文档
+│   ├── FG_CLIP_GUIDE.md        # FG-CLIP 使用指南
+│   └── PROMPT_OPTIMIZATION.md  # Prompt 优化指南
+│
+└── tests/                      # 单元测试
+```
+
+## 配置说明
+
+### 检测场景配置
+
+在 `config/detection/` 下创建或修改 YAML 文件来自定义检测场景：
+
+```yaml
+scenarios:
+  fall:                                    # 场景 ID
+    enabled: true                          # 是否启用
+    name: 跌倒检测                          # 显示名称
+    prompt: a person has fallen and is lying on the floor  # 检测 Prompt
+    prompt_cn: 有人摔倒躺在地上              # 中文描述（用于显示）
+    threshold: 0.4                         # 检测阈值
+    cooldown: 30                           # 冷却时间（秒）
+    consecutive_frames: 2                  # 连续帧要求
+    alert_level: high                      # 警报级别 (high/medium/low)
+```
+
+### 切换检测配置
 
 ```bash
-python main.py --config-name=config_fgclip mode=camera camera.index=2
+# 使用养老场景扩展配置
+python main.py --config-name=config_fgclip detection=elderly_care mode=camera
+
+# 使用精简配置
+python main.py --config-name=config_fgclip detection=minimal mode=camera
 ```
 
-详细对比和使用说明请参考 [FG-CLIP集成指南](docs/FG_CLIP_GUIDE.md)。
+### Prompt 优化建议
 
-假如您需要对于报错信息进行调试，可以采用debug模式运行：
+经测试，**英文描述性长句效果最佳**。详见 [Prompt 优化指南](docs/PROMPT_OPTIMIZATION.md)。
+
+| 风格 | 示例 | 效果 |
+|------|------|------|
+| ✅ 推荐 | `a person has fallen and is lying on the floor` | 0.95 |
+| ❌ 不推荐 | `person falling` | 0.57 |
+
+## 开发指南
+
+### 开发环境设置
 
 ```bash
-# 打印完整配置信息
-python main.py mode=camera debug=true
+# 安装开发依赖
+pip install -r requirements.txt
 
-# 查看更多日志
-python main.py mode=camera alert.log.level=DEBUG
+# 代码格式化
+black src/ gui/ tests/
+
+# 代码检查
+flake8 src/ gui/
+
+# 运行测试
+pytest tests/ -v
 ```
 
-TODO: 完善后续用于开源的README文件
+### 添加新检测场景
+
+1. 在 `config/detection/` 下创建新的 YAML 文件或修改现有文件
+2. 按照上述格式添加场景配置
+3. 运行测试验证效果：
+
+```bash
+python main.py --config-name=config_fgclip detection=your_config mode=video video_path=your_test.mp4
+```
+
+### 模型扩展
+
+如需集成新的 VLM 模型，参考 `src/models/fgclip_wrapper.py` 实现以下接口：
+
+```python
+class YourModelWrapper:
+    def __init__(self, model_name: str, device: str = None):
+        # 初始化模型
+        pass
+    
+    def predict(self, image: Image, prompts: List[str]) -> Tuple[Tensor, Tensor]:
+        # 返回 (logits, probabilities)
+        pass
+```
+
+### 代码规范
+
+- 使用 [Black](https://github.com/psf/black) 格式化代码
+- 遵循 [PEP 8](https://pep8.org/) 风格指南
+- 函数和类需添加 docstring
+- 提交前运行 `pytest` 确保测试通过
+
+## 常见问题
+
+<details>
+<summary><b>Q: GUI 中文显示为方框？</b></summary>
+
+安装中文字体：
+```bash
+# Ubuntu/Debian
+sudo apt-get install fonts-noto-cjk fonts-wqy-zenhei
+
+# 刷新字体缓存
+fc-cache -fv
+```
+</details>
+
+<details>
+<summary><b>Q: 摄像头无法打开？</b></summary>
+
+尝试不同的摄像头索引：
+```bash
+python main.py mode=camera camera.index=0  # 或 1, 2
+```
+</details>
+
+<details>
+<summary><b>Q: 显存不足？</b></summary>
+
+使用精简配置或降低分辨率：
+```bash
+python main.py --config-name=config_fgclip detection=minimal camera.width=640 camera.height=480
+```
+</details>
+
+## 贡献者
+
+本项目由上海交通大学 2025 级本科生团队开发：
+
+- 开发团队成员
+
+欢迎提交 Issue 和 Pull Request！
+
+## 许可证
+
+本项目采用 [MIT License](LICENSE) 开源。
+
+## 致谢
+
+- [OpenAI CLIP](https://github.com/openai/CLIP)
+- [FG-CLIP 2 (Qihoo 360)](https://github.com/360CVGroup/FG-CLIP)
+- [Hydra](https://hydra.cc/)
+
+---
+
+<p align="center">
+  Made with ❤️ at Shanghai Jiao Tong University
+</p>
