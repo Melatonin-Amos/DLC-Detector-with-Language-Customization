@@ -247,8 +247,6 @@ def main(cfg: DictConfig):
             app.run_camera_mode()
         elif mode == 'video':
             app.run_video_mode()
-        elif mode == 'gui':
-            app.run_gui_mode()
         else:
             logger.error(f"❌ 未知的运行模式: {mode}")
             logger.info("支持的模式: camera | video")
