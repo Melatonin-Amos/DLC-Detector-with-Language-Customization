@@ -2,7 +2,7 @@
 #
 # 功能说明：
 # 1. 提供场景配置界面
-# 2. RTSP流配置
+# 2. 视频/摄像头配置
 # 3. 阈值调整（不给用户）
 #
 # 主要类：
@@ -11,8 +11,9 @@
 # 开发优先级：⭐ (第10-11周完成)
 
 import tkinter as tk
-from tkinter import ttk, messagebox, font
+from tkinter import ttk, messagebox, filedialog
 from typing import Dict, Optional, Union
+from ttkthemes import ThemedStyle
 
 
 class SettingsPanel:
@@ -29,17 +30,26 @@ class SettingsPanel:
             app_config: 应用程序配置字典（从主窗口传入，用于持久化配置）
         """
         self.parent = parent
-
-        # 设置全局字体
-        system_font = font.nametofont("TkDefaultFont")
-        self.parent.option_add("*Font", system_font)
         self.current_page: Optional[str] = None
         self.content_frames: Dict[str, ttk.Frame] = {}
+
+        # 初始化字体配置
+        self._setup_fonts()
 
         # 使用传入的配置或创建新配置（用于测试）
         if app_config is None:
             # 测试模式：创建默认配置
             self.app_config = {
+                "video": {
+                    "default_path": "",
+                    "auto_play": True,
+                    "loop_play": False,
+                    "default_speed": "1.0",
+                },
+                "camera": {
+                    "camera_index": "0",
+                    "resolution": "1280x720",
+                },
                 "scene": {
                     "scene_type": "摔倒",  # 保留用于向后兼容
                     "selected_scenes": ["摔倒"],  # 新增：用户选择的多个场景
@@ -55,14 +65,28 @@ class SettingsPanel:
             # 生产模式：使用主窗口传入的配置
             self.app_config = app_config
             # 确保存在 selected_scenes 字段（向后兼容）
-            if "selected_scenes" not in self.app_config["scene"]:
+            if "selected_scenes" not in self.app_config.get("scene", {}):
                 # 从旧的 scene_type 初始化
-                self.app_config["scene"]["selected_scenes"] = [
-                    self.app_config["scene"]["scene_type"]
-                ]
+                if "scene" in self.app_config:
+                    self.app_config["scene"]["selected_scenes"] = [
+                        self.app_config["scene"].get("scene_type", "摔倒")
+                    ]
+            # 确保存在 video 和 camera 配置
+            if "video" not in self.app_config:
+                self.app_config["video"] = {
+                    "default_path": "",
+                    "auto_play": True,
+                    "loop_play": False,
+                    "default_speed": "1.0",
+                }
+            if "camera" not in self.app_config:
+                self.app_config["camera"] = {
+                    "camera_index": "0",
+                    "resolution": "1280x720",
+                }
 
         # 场景类型列表（引用配置中的数据）
-        self.scene_types: list[str] = self.app_config["scene_types"]
+        self.scene_types: list[str] = self.app_config.get("scene_types", ["摔倒", "起火"])
 
         # 场景复选框变量字典 {场景名: BooleanVar}
         self.scene_checkbox_vars: Dict[str, tk.BooleanVar] = {}
@@ -73,8 +97,8 @@ class SettingsPanel:
         # 缩放状态跟踪
         self._resize_state = {
             "lock": False,  # 防止递归调用
-            "width": 1200,  # 初始宽度
-            "height": 800,  # 初始高度 (保持3:2比例)
+            "width": 1000,  # 初始宽度
+            "height": 666,  # 初始高度 (保持3:2比例)
             "initialized": False,  # 是否已完成初始化
         }
 
@@ -90,11 +114,53 @@ class SettingsPanel:
         # 创建各个设置页面
         self._create_pages()
 
-        # 默认显示场景页面
-        self.show_page("scene")
+        # 默认显示视频配置页面
+        self.show_page("video")
 
         # 绑定窗口缩放事件
         self.parent.bind("<Configure>", self._on_window_resize)
+
+    def _setup_fonts(self) -> None:
+        """配置字体和样式"""
+        # 强制使用微软雅黑，全部加粗
+        self.font_family = "Microsoft YaHei"
+
+        # 定义不同用途的字体 - 全部加粗，字号加大
+        self.fonts = {
+            "normal": (self.font_family, 12, "bold"),
+            "title": (self.font_family, 16, "bold"),
+            "large": (self.font_family, 18, "bold"),
+            "small": (self.font_family, 11, "bold"),
+            "italic": (self.font_family, 12, "bold"),
+        }
+
+        # 配置ttk样式
+        style = ttk.Style()
+
+        # 配置基本样式
+        style.configure(".", font=self.fonts["normal"])
+        style.configure("TButton", font=self.fonts["normal"], padding=(12, 6))
+        style.configure("TLabel", font=self.fonts["normal"])
+        style.configure("TLabelframe", padding=15)
+        style.configure("TLabelframe.Label", font=self.fonts["title"])
+        style.configure("TCombobox", padding=5)
+        style.configure("TEntry", padding=5)
+        style.configure("TCheckbutton", font=self.fonts["normal"])
+        style.configure("TRadiobutton", font=self.fonts["normal"])
+
+        # 自定义导航按钮样式
+        style.configure(
+            "Nav.TButton",
+            font=self.fonts["normal"],
+            padding=(15, 12),
+        )
+
+        # 自定义操作按钮样式
+        style.configure(
+            "Action.TButton",
+            font=self.fonts["normal"],
+            padding=(12, 8),
+        )
 
     def _create_main_container(self) -> None:
         """创建主容器"""
@@ -108,22 +174,33 @@ class SettingsPanel:
 
     def _create_navigation(self) -> None:
         """创建左侧导航栏"""
-        # 导航栏框架
-        nav_frame = ttk.LabelFrame(self.main_container, text="设置选项", padding="15")
-        nav_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+        # 导航栏框架 - 增加内边距
+        nav_frame = ttk.LabelFrame(self.main_container, text="设置选项", padding=15)
+        nav_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 15))
 
-        # 导航按钮样式配置
-        button_style = {"width": 20, "padding": 12}
+        # 1. 视频配置按钮
+        self.btn_video = ttk.Button(
+            nav_frame,
+            text="🎬 视频配置",
+            command=lambda: self.show_page("video"),
+            width=18,
+            style="Nav.TButton",
+        )
+        self.btn_video.pack(fill=tk.X, pady=(0, 12))
+
         # 2. 场景配置按钮
         self.btn_scene = ttk.Button(
             nav_frame,
-            text="🎬 场景配置",
+            text="🎯 场景配置",
             command=lambda: self.show_page("scene"),
-            **button_style,
+            width=18,
+            style="Nav.TButton",
         )
-        self.btn_scene.pack(fill=tk.X, pady=(0, 15))
+        self.btn_scene.pack(fill=tk.X, pady=(0, 12))
+
         # 保存按钮列表以便高亮显示
         self.nav_buttons = {
+            "video": self.btn_video,
             "scene": self.btn_scene,
         }
 
@@ -156,21 +233,164 @@ class SettingsPanel:
 
     def _create_pages(self) -> None:
         """创建所有设置页面"""
+        # 创建视频配置页面
+        self.content_frames["video"] = self._create_video_page()
+
         # 创建场景配置页面
         self.content_frames["scene"] = self._create_scene_page()
 
+    def _create_video_page(self) -> ttk.Frame:
+        """创建视频配置页面"""
+        frame = ttk.LabelFrame(
+            self.content_container, text="🎬 视频配置", padding=20
+        )
+
+        # 说明文字
+        desc_label = ttk.Label(
+            frame,
+            text="配置本地视频和摄像头参数",
+            font=self.fonts["italic"],
+            foreground="gray",
+        )
+        desc_label.pack(anchor="w", pady=(0, 20))
+
+        # === 本地视频设置 ===
+        video_section = ttk.LabelFrame(frame, text="本地视频", padding=15)
+        video_section.pack(fill=tk.X, pady=(0, 20))
+
+        # 默认视频路径
+        path_frame = ttk.Frame(video_section)
+        path_frame.pack(fill=tk.X, pady=(0, 12))
+
+        ttk.Label(path_frame, text="默认路径:", width=12, anchor="w").pack(side=tk.LEFT)
+        self.video_path_var = tk.StringVar(value=self.app_config.get("video", {}).get("default_path", ""))
+        ttk.Entry(path_frame, textvariable=self.video_path_var, width=40).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(10, 10))
+        ttk.Button(path_frame, text="浏览...", command=self._browse_video, width=10, style="Action.TButton").pack(side=tk.LEFT)
+
+        # 播放选项
+        options_frame = ttk.Frame(video_section)
+        options_frame.pack(fill=tk.X, pady=(0, 12))
+
+        self.auto_play_var = tk.BooleanVar(value=self.app_config.get("video", {}).get("auto_play", True))
+        ttk.Checkbutton(options_frame, text="加载后自动播放", variable=self.auto_play_var).pack(side=tk.LEFT, padx=(0, 30))
+
+        self.loop_play_var = tk.BooleanVar(value=self.app_config.get("video", {}).get("loop_play", False))
+        ttk.Checkbutton(options_frame, text="循环播放", variable=self.loop_play_var).pack(side=tk.LEFT)
+
+        # 默认倍速
+        speed_frame = ttk.Frame(video_section)
+        speed_frame.pack(fill=tk.X, pady=(0, 8))
+
+        ttk.Label(speed_frame, text="默认倍速:", width=12, anchor="w").pack(side=tk.LEFT)
+        self.default_speed_var = tk.StringVar(value=self.app_config.get("video", {}).get("default_speed", "1.0"))
+        speed_combo = ttk.Combobox(
+            speed_frame,
+            textvariable=self.default_speed_var,
+            values=["0.25", "0.5", "1.0", "1.5", "2.0", "3.0"],
+            state="readonly",
+            width=12
+        )
+        speed_combo.pack(side=tk.LEFT, padx=(10, 0))
+
+        # === 摄像头设置 ===
+        camera_section = ttk.LabelFrame(frame, text="本地摄像头", padding=15)
+        camera_section.pack(fill=tk.X, pady=(0, 20))
+
+        # 摄像头索引
+        camera_frame = ttk.Frame(camera_section)
+        camera_frame.pack(fill=tk.X, pady=(0, 12))
+
+        ttk.Label(camera_frame, text="摄像头索引:", width=12, anchor="w").pack(side=tk.LEFT)
+        self.camera_index_var = tk.StringVar(value=self.app_config.get("camera", {}).get("camera_index", "0"))
+        ttk.Combobox(
+            camera_frame,
+            textvariable=self.camera_index_var,
+            values=["0", "1", "2", "3"],
+            state="readonly",
+            width=12
+        ).pack(side=tk.LEFT, padx=(10, 0))
+
+        # 分辨率
+        resolution_frame = ttk.Frame(camera_section)
+        resolution_frame.pack(fill=tk.X, pady=(0, 8))
+
+        ttk.Label(resolution_frame, text="分辨率:", width=12, anchor="w").pack(side=tk.LEFT)
+        self.resolution_var = tk.StringVar(value=self.app_config.get("camera", {}).get("resolution", "1280x720"))
+        ttk.Combobox(
+            resolution_frame,
+            textvariable=self.resolution_var,
+            values=["640x480", "1280x720", "1920x1080"],
+            state="readonly",
+            width=15
+        ).pack(side=tk.LEFT, padx=(10, 0))
+
+        # 按钮区域 - 增加间距
+        button_frame = ttk.Frame(frame)
+        button_frame.pack(fill=tk.X, pady=(15, 0))
+
+        ttk.Button(
+            button_frame,
+            text="测试摄像头",
+            command=self._test_camera,
+            style="Action.TButton"
+        ).pack(side=tk.LEFT, padx=(0, 15))
+
+        ttk.Button(
+            button_frame,
+            text="保存配置",
+            command=self._save_video_config,
+            style="Action.TButton"
+        ).pack(side=tk.LEFT)
+
+        return frame
+
+    def _browse_video(self) -> None:
+        """浏览选择视频文件"""
+        file_path = filedialog.askopenfilename(
+            title="选择视频文件",
+            filetypes=[
+                ("视频文件", "*.mp4 *.avi *.mkv *.mov *.wmv *.flv"),
+                ("所有文件", "*.*")
+            ]
+        )
+        if file_path:
+            self.video_path_var.set(file_path)
+
+    def _test_camera(self) -> None:
+        """测试摄像头连接"""
+        camera_index = int(self.camera_index_var.get())
+        messagebox.showinfo("测试摄像头", f"正在测试摄像头 {camera_index}...\n(此功能待实现)")
+
+    def _save_video_config(self) -> None:
+        """保存视频配置"""
+        # 更新配置
+        if "video" not in self.app_config:
+            self.app_config["video"] = {}
+        if "camera" not in self.app_config:
+            self.app_config["camera"] = {}
+
+        self.app_config["video"]["default_path"] = self.video_path_var.get()
+        self.app_config["video"]["auto_play"] = self.auto_play_var.get()
+        self.app_config["video"]["loop_play"] = self.loop_play_var.get()
+        self.app_config["video"]["default_speed"] = self.default_speed_var.get()
+        self.app_config["camera"]["camera_index"] = self.camera_index_var.get()
+        self.app_config["camera"]["resolution"] = self.resolution_var.get()
+
+        messagebox.showinfo("保存成功", "视频配置已保存")
+        print(f"视频配置已保存: {self.app_config['video']}, {self.app_config['camera']}")
+
     def _create_scene_page(self) -> ttk.Frame:
         """创建场景配置页面"""
-        frame = ttk.LabelFrame(self.content_container, text="🎬 场景配置", padding="25")
+        frame = ttk.LabelFrame(self.content_container, text="🎯 场景配置", padding=20)
 
         # 说明文字
         desc_label = ttk.Label(
             frame,
             text="选择要启用的检测场景（可多选）",
-            font=("Arial", 12, "italic"),
+            font=self.fonts["italic"],
             foreground="gray",
         )
-        desc_label.pack(anchor="w", pady=(0, 25))
+        desc_label.pack(anchor="w", pady=(0, 20))
 
         # 场景管理按钮区
         button_frame = ttk.Frame(frame)
@@ -182,7 +402,7 @@ class SettingsPanel:
             text="➕ 新建场景",
             command=self._create_new_scene,
             width=13,
-            padding=5,
+            style="Action.TButton",
         ).pack(side=tk.LEFT, padx=(0, 12))
 
         # 删除场景按钮
@@ -191,11 +411,11 @@ class SettingsPanel:
             text="🗑️ 删除场景",
             command=self._delete_selected_scenes,
             width=13,
-            padding=5,
+            style="Action.TButton",
         ).pack(side=tk.LEFT)
 
         # 场景选择区域（可滚动）
-        scene_frame = ttk.LabelFrame(frame, text="场景列表（勾选启用）", padding="18")
+        scene_frame = ttk.LabelFrame(frame, text="场景列表（勾选启用）", padding=18)
         scene_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 20))
 
         # 创建滚动条和画布
@@ -220,53 +440,89 @@ class SettingsPanel:
         self._create_scene_checkboxes()
 
         # 场景参数区域
-        params_frame = ttk.LabelFrame(frame, text="通用场景参数", padding="15")
+        params_frame = ttk.LabelFrame(frame, text="通用场景参数", padding=15)
         params_frame.pack(fill=tk.X, pady=(0, 15))
+
+        # 光照条件
+        light_frame = ttk.Frame(params_frame)
+        light_frame.pack(fill=tk.X, pady=(0, 15))
+
+        ttk.Label(light_frame, text="光照条件:", width=12, anchor="w").pack(side=tk.LEFT)
+        self.light_condition_var = tk.StringVar(
+            value=self.app_config.get("scene", {}).get("light_condition", "normal")
+        )
+        ttk.Radiobutton(
+            light_frame, text="明亮", variable=self.light_condition_var, value="bright"
+        ).pack(side=tk.LEFT, padx=(10, 15))
+        ttk.Radiobutton(
+            light_frame, text="正常", variable=self.light_condition_var, value="normal"
+        ).pack(side=tk.LEFT, padx=(0, 15))
+        ttk.Radiobutton(
+            light_frame, text="昏暗", variable=self.light_condition_var, value="dim"
+        ).pack(side=tk.LEFT)
+
+        # 检测区域
+        area_frame = ttk.Frame(params_frame)
+        area_frame.pack(fill=tk.X, pady=(0, 15))
+
+        ttk.Label(area_frame, text="检测区域:", width=12, anchor="w").pack(side=tk.LEFT)
+        self.enable_roi_var = tk.BooleanVar(
+            value=self.app_config.get("scene", {}).get("enable_roi", False)
+        )
+        ttk.Checkbutton(
+            area_frame,
+            text="启用感兴趣区域(ROI)",
+            variable=self.enable_roi_var,
+            command=self._toggle_roi,
+        ).pack(side=tk.LEFT, padx=(10, 0))
 
         # 报警设置
         alarm_frame = ttk.Frame(params_frame)
         alarm_frame.pack(fill=tk.X, pady=(0, 15))
 
-        ttk.Label(alarm_frame, text="报警设置:", width=12, font=("Arial", 11)).pack(
-            side=tk.LEFT
-        )
+        ttk.Label(alarm_frame, text="报警设置:", width=12, anchor="w").pack(side=tk.LEFT)
         self.enable_sound_var = tk.BooleanVar(
-            value=self.app_config["scene"]["enable_sound"]
+            value=self.app_config.get("scene", {}).get("enable_sound", True)
         )
         ttk.Checkbutton(
             alarm_frame, text="声音报警", variable=self.enable_sound_var
-        ).pack(side=tk.LEFT, padx=8)
+        ).pack(side=tk.LEFT, padx=(10, 20))
 
         self.enable_email_var = tk.BooleanVar(
-            value=self.app_config["scene"]["enable_email"]
+            value=self.app_config.get("scene", {}).get("enable_email", False)
         )
         ttk.Checkbutton(
             alarm_frame, text="短信通知", variable=self.enable_email_var
-        ).pack(side=tk.LEFT, padx=8)
+        ).pack(side=tk.LEFT)
 
         # 录像设置
         record_frame = ttk.Frame(params_frame)
-        record_frame.pack(fill=tk.X, pady=(0, 0))
+        record_frame.pack(fill=tk.X, pady=(0, 10))
 
-        ttk.Label(record_frame, text="录像设置:", width=12, font=("Arial", 11)).pack(
-            side=tk.LEFT
-        )
+        ttk.Label(record_frame, text="录像设置:", width=12, anchor="w").pack(side=tk.LEFT)
         self.auto_record_var = tk.BooleanVar(
-            value=self.app_config["scene"]["auto_record"]
+            value=self.app_config.get("scene", {}).get("auto_record", False)
         )
         ttk.Checkbutton(
             record_frame, text="事件触发时自动录像", variable=self.auto_record_var
-        ).pack(side=tk.LEFT, padx=(8, 0))
+        ).pack(side=tk.LEFT, padx=(10, 0))
 
         # 按钮区域
-        button_frame = ttk.Frame(frame)
-        button_frame.pack(fill=tk.X, pady=(15, 10))
+        scene_button_frame = ttk.Frame(frame)
+        scene_button_frame.pack(fill=tk.X, pady=(15, 10))
 
         ttk.Button(
-            button_frame,
+            scene_button_frame,
+            text="设置ROI区域",
+            command=self._set_roi_area,
+            style="Action.TButton"
+        ).pack(side=tk.LEFT, padx=(0, 15))
+
+        ttk.Button(
+            scene_button_frame,
             text="保存场景配置",
             command=self._save_scene_config,
-            padding=6,
+            style="Action.TButton"
         ).pack(side=tk.LEFT)
 
         return frame
@@ -302,7 +558,7 @@ class SettingsPanel:
                 self.scrollable_frame,
                 text="暂无场景，请点击'新建场景'添加",
                 foreground="gray",
-                font=("Arial", 11, "italic"),
+                font=self.fonts["small"],
             ).grid(row=0, column=0, padx=15, pady=20)
 
     def _on_scene_checkbox_change(self) -> None:
@@ -328,7 +584,7 @@ class SettingsPanel:
         显示指定的设置页面
 
         Args:
-            page_name: 页面名称 ('rtsp', 'scene')
+            page_name: 页面名称 ('video', 'scene')
         """
         # 隐藏当前页面
         if self.current_page and self.current_page in self.content_frames:
@@ -366,28 +622,28 @@ class SettingsPanel:
         dialog.transient(self.parent)
         dialog.grab_set()
 
-        # 创建输入框架
-        input_frame = ttk.Frame(dialog, padding="35")
+        # 创建输入框架 - 增加边距
+        input_frame = ttk.Frame(dialog, padding=40)
         input_frame.pack(fill=tk.BOTH, expand=True)
 
         # 说明标签
         ttk.Label(
-            input_frame, text="请输入新场景的名称：", font=("Arial", 13, "bold")
+            input_frame, text="请输入新场景的名称：", font=self.fonts["title"]
         ).pack(pady=(10, 25))
 
         # 场景名称输入框
         scene_name_var = tk.StringVar()
         name_entry = ttk.Entry(
-            input_frame, textvariable=scene_name_var, font=("Arial", 12), width=30
+            input_frame, textvariable=scene_name_var, font=self.fonts["title"], width=30
         )
-        name_entry.pack(pady=(0, 25))
+        name_entry.pack(pady=(0, 20), ipady=5)
         name_entry.focus()
 
         # 提示文字
         ttk.Label(
             input_frame,
             text="例如：跌倒、起火、闯入等",
-            font=("Arial", 10),
+            font=self.fonts["small"],
             foreground="gray",
         ).pack(pady=(0, 35))
 
@@ -424,15 +680,23 @@ class SettingsPanel:
 
         # 按钮框架（居中）
         button_frame = ttk.Frame(input_frame)
-        button_frame.pack(pady=(10, 0))
+        button_frame.pack(pady=(15, 0))
 
         ttk.Button(
-            button_frame, text="✓ 确定", command=on_confirm, width=15, padding=8
-        ).pack(side=tk.LEFT, padx=10)
+            button_frame,
+            text="✓ 确定",
+            command=on_confirm,
+            width=12,
+            style="Action.TButton"
+        ).pack(side=tk.LEFT, padx=15)
 
         ttk.Button(
-            button_frame, text="✕ 取消", command=on_cancel, width=15, padding=8
-        ).pack(side=tk.LEFT, padx=10)
+            button_frame,
+            text="✕ 取消",
+            command=on_cancel,
+            width=12,
+            style="Action.TButton"
+        ).pack(side=tk.LEFT, padx=15)
 
         # 绑定回车键
         name_entry.bind("<Return>", lambda e: on_confirm())
@@ -1146,7 +1410,7 @@ def main() -> None:
     """测试设置面板"""
     root = tk.Tk()
     root.title("DLC检测系统 - 设置")
-    root.geometry("1200x800")  # 最小尺寸,保持3:2比例
+    root.geometry("1000x666")  # 最小尺寸,保持3:2比例
 
     # 创建设置面板
     panel = SettingsPanel(root)
