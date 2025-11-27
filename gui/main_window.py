@@ -27,12 +27,14 @@ import numpy as np
 
 try:
     from ttkthemes import ThemedTk
+
     HAS_THEMES = True
 except ImportError:
     HAS_THEMES = False
     print("⚠️ ttkthemes 未安装，使用默认主题")
 
 from gui.settings_panel import SettingsPanel
+from src.utils.config_updater import ConfigUpdater
 
 
 class MainWindow:
@@ -51,12 +53,12 @@ class MainWindow:
             self.root = ThemedTk(theme="arc")
         else:
             self.root = tk.Tk()
-        
+
         self.root.title("DLC检测系统 - 智能养老监护")
-        
+
         # 初始化字体配置
         self._setup_fonts()
-        
+
         # 获取屏幕尺寸
         self.screen_width = self.root.winfo_screenwidth()
         self.screen_height = self.root.winfo_screenheight()
@@ -77,6 +79,13 @@ class MainWindow:
         # 设置窗口引用
         self.settings_window: Optional[tk.Toplevel] = None
         self.settings_panel: Optional[SettingsPanel] = None
+
+        # 配置更新器
+        try:
+            self.config_updater = ConfigUpdater()
+        except Exception as e:
+            print(f"⚠️  配置更新器初始化失败: {e}")
+            self.config_updater = None
 
         # 持久化配置数据
         self.app_config = {
@@ -112,7 +121,7 @@ class MainWindow:
         self.is_playing: bool = False
         self.is_paused: bool = False
         self.update_id: Optional[str] = None
-        
+
         # 本地视频相关
         self.current_video_path: Optional[str] = None
         self.is_local_video: bool = False
@@ -135,7 +144,7 @@ class MainWindow:
         """配置字体和样式"""
         # 强制使用微软雅黑，全部加粗
         self.font_family = "Microsoft YaHei"
-        
+
         # 定义不同用途的字体
         self.fonts = {
             "normal": (self.font_family, 12, "bold"),
@@ -145,7 +154,7 @@ class MainWindow:
             "header": ("Georgia", 22, "bold italic"),
             "replay": (self.font_family, 24, "bold"),
         }
-        
+
         # 配置ttk样式
         style = ttk.Style()
         style.configure(".", font=self.fonts["normal"])
@@ -153,10 +162,10 @@ class MainWindow:
         style.configure("TLabel", font=self.fonts["normal"])
         style.configure("TLabelframe", padding=15)
         style.configure("TLabelframe.Label", font=self.fonts["title"])
-        
+
         # 自定义按钮样式
         style.configure("Action.TButton", font=self.fonts["normal"], padding=(15, 8))
-    
+
     def _setup_window(self) -> None:
         """配置窗口基本属性"""
         center_x = int((self.screen_width - self.target_width) / 2)
@@ -219,7 +228,7 @@ class MainWindow:
         self.logo_frame = ttk.Frame(header_frame, width=80, height=80)
         self.logo_frame.grid(row=0, column=0, padx=(10, 20))
         self.logo_frame.grid_propagate(False)
-        
+
         # 尝试加载Logo
         try:
             logo_path = os.path.join(os.path.dirname(__file__), "logo.png")
@@ -235,25 +244,23 @@ class MainWindow:
                     self.logo_frame,
                     text="🎯",
                     font=(self.font_family, 36),
-                    bg="#f0f0f0"
+                    bg="#f0f0f0",
                 )
                 placeholder.place(relx=0.5, rely=0.5, anchor="center")
         except Exception as e:
             print(f"Logo加载失败: {e}")
             placeholder = tk.Label(
-                self.logo_frame,
-                text="🎯",
-                font=(self.font_family, 36)
+                self.logo_frame, text="🎯", font=(self.font_family, 36)
             )
             placeholder.place(relx=0.5, rely=0.5, anchor="center")
 
         # 艺术标题（中间）- 使用 tk.Label，设置背景透明
         title_container = ttk.Frame(header_frame)
         title_container.grid(row=0, column=1, sticky="w")
-        
+
         # 获取父容器背景色，确保无阴影
-        bg_color = self.root.cget('bg')
-        
+        bg_color = self.root.cget("bg")
+
         self.title_label = tk.Label(
             title_container,
             text="DLC：支持语义客制化的智能养老摄像头",
@@ -262,7 +269,7 @@ class MainWindow:
             bg=bg_color,
             bd=0,
             highlightthickness=0,
-            relief=tk.FLAT
+            relief=tk.FLAT,
         )
         self.title_label.pack(anchor="w")
 
@@ -291,7 +298,7 @@ class MainWindow:
             fill="#888888",
             justify="center",
         )
-        
+
         # 重播按钮（初始隐藏）
         self.replay_button = None
 
@@ -315,7 +322,7 @@ class MainWindow:
             to=100,
             orient=tk.HORIZONTAL,
             variable=self.progress_var,
-            command=self._on_progress_change
+            command=self._on_progress_change,
         )
         self.progress_bar.grid(row=0, column=1, sticky="ew")
 
@@ -335,7 +342,7 @@ class MainWindow:
             textvariable=self.speed_var,
             values=["0.25", "0.5", "1.0", "1.5", "2.0", "3.0"],
             state="readonly",
-            width=6
+            width=6,
         )
         speed_combo.grid(row=0, column=4)
         speed_combo.bind("<<ComboboxSelected>>", self._on_speed_change)
@@ -355,25 +362,34 @@ class MainWindow:
             text="▶ 开始检测",
             width=15,
             command=self._on_start_detection,
-            style="Action.TButton"
+            style="Action.TButton",
         )
         self.btn_start.pack(side="left", padx=5)
 
         self.btn_pause = ttk.Button(
-            button_container, text="⏸ 暂停", width=15, command=self._on_pause,
-            style="Action.TButton"
+            button_container,
+            text="⏸ 暂停",
+            width=15,
+            command=self._on_pause,
+            style="Action.TButton",
         )
         self.btn_pause.pack(side="left", padx=5)
 
         self.btn_stop = ttk.Button(
-            button_container, text="⏹ 停止", width=15, command=self._on_stop,
-            style="Action.TButton"
+            button_container,
+            text="⏹ 停止",
+            width=15,
+            command=self._on_stop,
+            style="Action.TButton",
         )
         self.btn_stop.pack(side="left", padx=5)
 
         self.btn_settings = ttk.Button(
-            button_container, text="⚙ 设置", width=15, command=self._on_settings,
-            style="Action.TButton"
+            button_container,
+            text="⚙ 设置",
+            width=15,
+            command=self._on_settings,
+            style="Action.TButton",
         )
         self.btn_settings.pack(side="left", padx=5)
 
@@ -389,9 +405,9 @@ class MainWindow:
         canvas_height = self.VIDEO_CANVAS_HEIGHT
 
         self.video_canvas.config(width=canvas_width, height=canvas_height)
-        
+
         # 更新占位文字位置
-        if hasattr(self, 'placeholder_text') and self.placeholder_text:
+        if hasattr(self, "placeholder_text") and self.placeholder_text:
             self.video_canvas.coords(
                 self.placeholder_text,
                 canvas_width // 2,
@@ -411,11 +427,13 @@ class MainWindow:
             actual_width = self.root.winfo_width()
             actual_height = self.root.winfo_height()
 
-            self._resize_state.update({
-                "width": actual_width,
-                "height": actual_height,
-                "initialized": True,
-            })
+            self._resize_state.update(
+                {
+                    "width": actual_width,
+                    "height": actual_height,
+                    "initialized": True,
+                }
+            )
 
             self._update_video_layout(actual_width, actual_height)
             self._resize_state["lock"] = False
@@ -433,8 +451,10 @@ class MainWindow:
         if new_width <= 0 or new_height <= 0:
             return
 
-        if (new_width == self._resize_state["width"] and 
-            new_height == self._resize_state["height"]):
+        if (
+            new_width == self._resize_state["width"]
+            and new_height == self._resize_state["height"]
+        ):
             return
 
         desired_height = int(new_width / self.aspect_ratio)
@@ -459,7 +479,7 @@ class MainWindow:
         self._update_video_layout(target_width, target_height)
 
     # ========== 视频源选择 ==========
-    
+
     def _on_start_detection(self) -> None:
         """开始检测按钮回调 - 弹出选择对话框"""
         if self.is_playing and not self.is_paused:
@@ -494,9 +514,7 @@ class MainWindow:
 
         # 标题
         ttk.Label(
-            content_frame,
-            text="请选择视频输入源",
-            font=self.fonts["title"]
+            content_frame, text="请选择视频输入源", font=self.fonts["title"]
         ).pack(pady=(0, 25))
 
         # 按钮框架
@@ -513,7 +531,7 @@ class MainWindow:
             text="📷 摄像头",
             command=on_camera,
             width=12,
-            style="Action.TButton"
+            style="Action.TButton",
         )
         camera_btn.pack(side=tk.LEFT, padx=10, expand=True)
 
@@ -527,16 +545,13 @@ class MainWindow:
             text="📁 本地视频上传",
             command=on_local_video,
             width=18,
-            style="Action.TButton"
+            style="Action.TButton",
         )
         video_btn.pack(side=tk.LEFT, padx=10, expand=True)
 
         # 取消按钮
         cancel_btn = ttk.Button(
-            content_frame,
-            text="取消",
-            command=dialog.destroy,
-            width=12
+            content_frame, text="取消", command=dialog.destroy, width=12
         )
         cancel_btn.pack(pady=(20, 0))
 
@@ -551,10 +566,10 @@ class MainWindow:
                 ("视频文件", "*.mp4 *.avi *.mkv *.mov *.wmv *.flv *.webm"),
                 ("MP4文件", "*.mp4"),
                 ("AVI文件", "*.avi"),
-                ("所有文件", "*.*")
-            ]
+                ("所有文件", "*.*"),
+            ],
         )
-        
+
         if file_path:
             self.current_video_path = file_path
             self.is_local_video = True
@@ -565,14 +580,16 @@ class MainWindow:
         try:
             self.is_local_video = False
             self.video_finished = False
-            
+
             # 隐藏重播按钮
             self._hide_replay_button()
 
             if self.video_capture is not None:
                 self.video_capture.release()
 
-            camera_index = int(self.app_config.get("camera", {}).get("camera_index", "0"))
+            camera_index = int(
+                self.app_config.get("camera", {}).get("camera_index", "0")
+            )
             print(f"正在打开摄像头 {camera_index}...")
             self.video_capture = cv2.VideoCapture(camera_index)
             self.video_capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
@@ -602,7 +619,7 @@ class MainWindow:
         try:
             self.is_local_video = True
             self.video_finished = False
-            
+
             # 隐藏重播按钮
             self._hide_replay_button()
 
@@ -618,11 +635,13 @@ class MainWindow:
                 return
 
             # 获取视频信息
-            self.video_total_frames = int(self.video_capture.get(cv2.CAP_PROP_FRAME_COUNT))
+            self.video_total_frames = int(
+                self.video_capture.get(cv2.CAP_PROP_FRAME_COUNT)
+            )
             self.video_fps = self.video_capture.get(cv2.CAP_PROP_FPS)
             if self.video_fps <= 0:
                 self.video_fps = 30.0
-            
+
             total_seconds = self.video_total_frames / self.video_fps
             self.time_total_label.config(text=self._format_time(total_seconds))
             self.progress_var.set(0)
@@ -637,7 +656,9 @@ class MainWindow:
             self.placeholder_text = None
 
             self._update_video_frame()
-            print(f"✓ 本地视频已启动: {self.video_total_frames}帧, {self.video_fps:.1f}fps")
+            print(
+                f"✓ 本地视频已启动: {self.video_total_frames}帧, {self.video_fps:.1f}fps"
+            )
 
         except Exception as e:
             messagebox.showerror("错误", f"启动视频失败:\n{str(e)}")
@@ -694,7 +715,20 @@ class MainWindow:
 
         self.settings_panel = SettingsPanel(self.settings_window, self.app_config)
 
+        # 启动场景变化监听器
+        if self.config_updater:
+            self.settings_panel.start_config_monitor(
+                callback=self._on_scene_config_change,
+                interval=500,  # 每500ms检查一次
+                print_changes=True,  # 打印变化信息
+                print_full_config=False,  # 不打印完整配置（避免刷屏）
+            )
+            print("✓ 场景变化监听器已启动")
+
         def on_settings_close():
+            # 停止监听器
+            if self.settings_panel:
+                self.settings_panel.stop_config_monitor()
             self.settings_window.destroy()
             self.settings_window = None
             self.settings_panel = None
@@ -757,35 +791,54 @@ class MainWindow:
                     frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
                     # CLIP检测（如果有detector）
-                    if hasattr(self, 'detector') and self.detector:
+                    if hasattr(self, "detector") and self.detector:
                         import time
+
                         current_time = time.time()
-                        if current_time - self.last_detect_time >= self.extract_interval:
+                        if (
+                            current_time - self.last_detect_time
+                            >= self.extract_interval
+                        ):
                             self.last_detect_time = current_time
                             try:
                                 result = self.detector.detect(frame_rgb, current_time)
-                                if result.get('detected', False):
-                                    print(f"⚠️  检测到: {result['scenario_name']} (置信度: {result['confidence']:.2%})")
-                                    if hasattr(self, 'alert_manager') and self.alert_manager:
-                                        self.alert_manager.trigger_alert(result, frame_rgb)
+                                if result.get("detected", False):
+                                    print(
+                                        f"⚠️  检测到: {result['scenario_name']} (置信度: {result['confidence']:.2%})"
+                                    )
+                                    if (
+                                        hasattr(self, "alert_manager")
+                                        and self.alert_manager
+                                    ):
+                                        self.alert_manager.trigger_alert(
+                                            result, frame_rgb
+                                        )
                             except Exception as e:
                                 print(f"检测错误: {e}")
 
                     # 更新进度条（仅本地视频）
                     if self.is_local_video and self.video_total_frames > 0:
-                        self.current_frame_pos = int(self.video_capture.get(cv2.CAP_PROP_POS_FRAMES))
-                        progress = (self.current_frame_pos / self.video_total_frames) * 100
+                        self.current_frame_pos = int(
+                            self.video_capture.get(cv2.CAP_PROP_POS_FRAMES)
+                        )
+                        progress = (
+                            self.current_frame_pos / self.video_total_frames
+                        ) * 100
                         self.progress_var.set(progress)
-                        
+
                         current_seconds = self.current_frame_pos / self.video_fps
-                        self.time_current_label.config(text=self._format_time(current_seconds))
+                        self.time_current_label.config(
+                            text=self._format_time(current_seconds)
+                        )
 
                     # 获取画布尺寸
                     canvas_width = self.video_canvas.winfo_width()
                     canvas_height = self.video_canvas.winfo_height()
 
                     # 调整帧大小
-                    frame_resized = self._resize_frame(frame_rgb, canvas_width, canvas_height)
+                    frame_resized = self._resize_frame(
+                        frame_rgb, canvas_width, canvas_height
+                    )
 
                     # 转换为PIL图像 → ImageTk
                     image = Image.fromarray(frame_resized)
@@ -815,9 +868,13 @@ class MainWindow:
 
             # 计算下一帧延时（考虑倍速）
             self.playback_speed = float(self.speed_var.get())
-            delay = int(1000 / (self.video_fps * self.playback_speed)) if self.is_local_video else 17
+            delay = (
+                int(1000 / (self.video_fps * self.playback_speed))
+                if self.is_local_video
+                else 17
+            )
             delay = max(1, delay)  # 最小1ms
-            
+
             self.update_id = self.root.after(delay, self._update_video_frame)
 
         except Exception as e:
@@ -829,7 +886,7 @@ class MainWindow:
         """视频播放完毕处理"""
         self.is_playing = False
         self.video_finished = True
-        
+
         if self.update_id is not None:
             self.root.after_cancel(self.update_id)
             self.update_id = None
@@ -864,15 +921,15 @@ class MainWindow:
             cursor="hand2",
             padx=20,
             pady=10,
-            command=self._on_replay
+            command=self._on_replay,
         )
-        
+
         # 放置在画布中央
         self.video_canvas.create_window(
             canvas_width // 2,
             canvas_height // 2,
             window=self.replay_button,
-            tags="replay_btn"
+            tags="replay_btn",
         )
 
     def _hide_replay_button(self) -> None:
@@ -893,7 +950,7 @@ class MainWindow:
             progress = float(value)
             target_frame = int((progress / 100) * self.video_total_frames)
             self.video_capture.set(cv2.CAP_PROP_POS_FRAMES, target_frame)
-            
+
             current_seconds = target_frame / self.video_fps
             self.time_current_label.config(text=self._format_time(current_seconds))
 
@@ -963,22 +1020,66 @@ class MainWindow:
             self.root.destroy()
         finally:
             sys.exit(0)
-    
+
     def set_video_stream(self, video_stream):
         """设置视频流（从main.py传入）"""
         self.video_stream = video_stream
         # 设置抽帧间隔
-        if video_stream and hasattr(video_stream, 'extract_interval'):
+        if video_stream and hasattr(video_stream, "extract_interval"):
             self.extract_interval = video_stream.extract_interval
             print(f"✓ 设置检测间隔: {self.extract_interval}秒/帧")
-    
+
     def set_detector(self, detector):
         """设置检测器（从main.py传入）"""
         self.detector = detector
-    
+
     def set_alert_manager(self, alert_manager):
         """设置警报管理器（从main.py传入）"""
         self.alert_manager = alert_manager
+
+    def _on_scene_config_change(self, old_config: Dict, new_config: Dict) -> None:
+        """
+        场景配置变化时的回调函数
+
+        Args:
+            old_config: 旧配置
+            new_config: 新配置
+
+        功能：
+        1. 检测 selected_scenes 是否发生变化
+        2. 如果变化，调用 ConfigUpdater 更新配置文件
+        3. 配置文件会包含所有场景，通过enabled字段控制是否检测
+        4. 未来：触发检测器重新加载配置
+        """
+        # 检查选中场景是否变化
+        old_scenes = set(old_config.get("selected_scenes", []))
+        new_scenes = set(new_config.get("selected_scenes", []))
+
+        if old_scenes != new_scenes:
+            print(f"\n{'🔔'*30}")
+            print(f"检测到场景选择变化！")
+            print(f"旧启用场景: {sorted(old_scenes) if old_scenes else '无'}")
+            print(f"新启用场景: {sorted(new_scenes) if new_scenes else '无'}")
+            print(f"{'🔔'*30}\n")
+
+            # 获取所有可用场景（从settings_panel获取）
+            if self.settings_panel:
+                all_scenes = self.settings_panel.get_all_scene_types()
+
+                # 更新配置文件（包含所有场景，通过enabled控制启用状态）
+                if self.config_updater:
+                    success = self.config_updater.update_scenarios(
+                        all_scenes=all_scenes, selected_scenes=sorted(new_scenes)
+                    )
+
+                    if success:
+                        print("✅ 配置文件已自动更新")
+                        print("   📝 配置文件包含所有场景，通过enabled字段控制是否检测")
+                        # TODO: 未来可以在这里触发检测器重新加载配置
+                        # if self.detector:
+                        #     self.detector.reload_config()
+                    else:
+                        print("❌ 配置文件更新失败")
 
     def run(self) -> None:
         """运行主窗口"""
