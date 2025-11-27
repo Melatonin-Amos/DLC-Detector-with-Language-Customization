@@ -21,6 +21,13 @@
 
 ---
 
+<div align="center">
+  
+#### _“用智能手段，为银龄生命加上DLC。”_
+
+</div>
+
+
 这是上海交通大学电子信息与电气工程学部的一群大一学生在 [工程学导论（ME1221）](https://oc.sjtu.edu.cn/courses/84663) 课程中开发的项目。本项目实现了一个**基于 VLM 的支持语义定制的智能养老摄像头系统**，利用大规模预训练视觉语言模型进行 zero-shot 场景识别，实现高度个性化的智能监护功能。
 
 ## 功能特性
@@ -252,6 +259,8 @@ python main.py --config-name=config_fgclip detection=minimal camera.width=640 ca
 
 欢迎提交 Issue 和 Pull Request！
 
+
+
 ## 许可证
 
 本项目采用 [MIT License](LICENSE) 开源。
@@ -262,8 +271,28 @@ python main.py --config-name=config_fgclip detection=minimal camera.width=640 ca
 - [FG-CLIP 2 (Qihoo 360)](https://github.com/360CVGroup/FG-CLIP)
 - [Hydra](https://hydra.cc/)
 
+
 ---
 
+<div align="center">
+
+## 💖 支持我们 / Support Us
+
+**代码不仅运行在 CPU 上，也运行在我们的咖啡因和热情之上。**
+
+如果您喜欢这个由 SJTU 大一新生构建的项目，<br>
+请点击右上角的 <img src="https://img.shields.io/github/stars/Melatonin-Amos/DLC-Detector-with-Language-Customization?style=social" alt="star"/> 按钮支持我们！
+
+每一个 Star ⭐️ 都能：
+👉 让我们的头发少掉一根
+👉 让我们的模型推理快 1ms (玄学)
+👉 鼓励我们在开源的道路上走得更远
+
+</div>
+
+---
 <p align="center">
   Made with ❤️ at Shanghai Jiao Tong University
 </p>
+
+---
