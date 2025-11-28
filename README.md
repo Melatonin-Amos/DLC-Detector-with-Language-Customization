@@ -78,7 +78,7 @@ sudo apt-get install -y fonts-noto-cjk fonts-wqy-zenhei
 python main.py --config-name=config_fgclip mode=camera camera.index=0
 
 # 使用视频文件测试
-python main.py --config-name=config_fgclip mode=video video_path=assets/test_videos/fall_detection/fall1.mp4
+python main.py --config-name=config_fgclip mode=video video_path=assets/test_videos/fire_detection/fire3.mp4
 
 # 使用原版 CLIP 模型（需配置翻译 API）
 export GEMINI_API_KEY="your_api_key"
@@ -257,7 +257,11 @@ python main.py --config-name=config_fgclip detection=minimal camera.width=640 ca
 
 - 开发团队成员
 
-欢迎提交 Issue 和 Pull Request！
+欢迎提交 Issue 和 Pull Request！我们特别鼓励您进行下面的增量式更新并且提交PR：
+
+  - 隐私保护：在边缘设备+服务器的计算情境，如何保持摄像头视觉信息可能携带的用户隐私的安全性？您可以尝试使用稀疏视觉输入。
+  - 更加开盒即用：可以简化当前的运行逻辑，把更多自由度交给GUI
+  - 跨终端GUI与应用：可以开发针对安卓、iOS的GUI和通讯、计算机制
 
 
 
