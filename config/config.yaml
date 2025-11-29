@@ -15,7 +15,7 @@ video_path: null  # 视频模式下的视频文件路径
 # 翻译配置（中文提示词转英文）
 translation:
   enabled: true
-  api_key: sk-cd035e75503c43b48b30edd49de9bf7b  # DeepSeek API Key
+  api_key: "your_api_key_here"  # DeepSeek API Key
   model: deepseek-chat
   cache_enabled: true  # 缓存已翻译的文本
 
