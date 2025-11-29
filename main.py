@@ -27,6 +27,7 @@ import time
 import sys
 import os
 from pathlib import Path
+import shutil
 
 # 添加项目根目录到Python路径
 sys.path.insert(0, str(Path(__file__).parent))
@@ -38,6 +39,24 @@ from src.utils.logger import setup_logger
 from src.utils.translator import ChineseTranslator
 
 logger = logging.getLogger(__name__)
+
+
+def reset_default_config():
+    """仅在 default.yaml 不存在时从模板创建"""
+    config_dir = Path(__file__).parent / "config" / "detection"
+    default_config = config_dir / "default.yaml"
+    template_config = config_dir / "default.yaml.template"
+
+    # 只有当 default.yaml 不存在时才从模板复制
+    if not default_config.exists():
+        if template_config.exists():
+            try:
+                shutil.copy2(template_config, default_config)
+                print(f"✅ 已从模板创建 default.yaml")
+            except Exception as e:
+                print(f"⚠️  创建默认配置失败: {e}")
+        else:
+            print(f"⚠️  未找到模板文件: {template_config}")
 
 
 class DLCApplication:
@@ -78,7 +97,7 @@ class DLCApplication:
                 logger.info("初始化中文翻译器...")
                 self.translator = ChineseTranslator(
                     api_key=api_key,
-                    model=translation_config.get("model", "gemini-2.5-flash"),
+                    model=translation_config.get("model", "gemini-1.5-flash"),
                     cache_enabled=translation_config.get("cache_enabled", True),
                 )
             else:
@@ -250,6 +269,9 @@ class DLCApplication:
 @hydra.main(version_base=None, config_path="config", config_name="config")
 def main(cfg: DictConfig):
     """主函数"""
+
+    # 程序启动时恢复默认配置
+    reset_default_config()
 
     # 打印配置（调试模式）
     if cfg.get("debug", False):

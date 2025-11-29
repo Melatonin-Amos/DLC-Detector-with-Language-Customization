@@ -18,28 +18,25 @@ import signal
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
-# Gemini API 支持（可选依赖）
+# DeepSeek API 支持（可选依赖）
 try:
-    import google.generativeai as genai
-    from google.generativeai.types import GenerationConfig
+    from openai import OpenAI
 
-    GEMINI_AVAILABLE = True
+    DEEPSEEK_AVAILABLE = True
 except ImportError:
-    GEMINI_AVAILABLE = False
-    print("⚠️  google-generativeai 未安装，Gemini 功能不可用")
-    print("   安装命令: pip install google-generativeai>=0.3.0")
+    DEEPSEEK_AVAILABLE = False
+    print("⚠️  openai 未安装，AI 生成功能不可用")
+    print("   安装命令: pip install openai")
 
 
 class ConfigUpdater:
     """配置更新器 - 负责根据用户选择的场景更新配置文件"""
 
-    # Gemini API 密钥（可通过环境变量或直接设置）
-    GEMINI_API_KEY = os.environ.get(
-        "GEMINI_API_KEY", "AIzaSyAaP4jRzbTsYrAiHigrbMgQ-QJZvHtG4LY"
-    )
+    # DeepSeek API 密钥
+    DEEPSEEK_API_KEY = "sk-cd035e75503c43b48b30edd49de9bf7b"
 
-    # Gemini API 超时时间（秒）
-    GEMINI_TIMEOUT = 15
+    # API 超时时间（秒）
+    API_TIMEOUT = 30
 
     def __init__(self, config_path: str = "config/detection/default.yaml"):
         """
@@ -56,84 +53,88 @@ class ConfigUpdater:
         if not self.config_file.exists():
             raise FileNotFoundError(f"配置文件不存在: {self.config_file}")
 
-        # 初始化 Gemini 模型
-        self.gemini_model = None
-        if GEMINI_AVAILABLE and self.GEMINI_API_KEY:
-            self._init_gemini()
+        # 初始化 DeepSeek 客户端
+        self.ai_client = None
+        if DEEPSEEK_AVAILABLE and self.DEEPSEEK_API_KEY:
+            self._init_deepseek()
 
         print(f"✓ 配置更新器初始化: {self.config_file}")
 
-    def _init_gemini(self) -> None:
-        """初始化 Gemini API 客户端"""
+    def _init_deepseek(self) -> None:
+        """初始化 DeepSeek API 客户端"""
         try:
-            # 配置带超时的 HTTP 客户端
-            genai.configure(
-                api_key=self.GEMINI_API_KEY,
-                transport="rest",  # 使用 REST API（更容易控制超时）
+            self.ai_client = OpenAI(
+                api_key=self.DEEPSEEK_API_KEY, base_url="https://api.deepseek.com"
             )
-            # 配置生成参数，设置较短的响应长度以加快速度
-            generation_config = GenerationConfig(
-                temperature=0.7,
-                max_output_tokens=500,
-            )
-            self.gemini_model = genai.GenerativeModel(
-                "gemini-2.0-flash", generation_config=generation_config
-            )
-            print("✓ Gemini API 初始化成功")
+            print("✓ DeepSeek API 初始化成功")
         except Exception as e:
-            print(f"⚠️  Gemini API 初始化失败: {e}")
-            self.gemini_model = None
+            print(f"⚠️  DeepSeek API 初始化失败: {e}")
+            print(f"   提示: 检查网络连接和 API 密钥是否正确")
+            self.ai_client = None
 
-    def _call_gemini_with_timeout(
-        self, prompt: str, timeout: int = None
-    ) -> Optional[str]:
+    def _call_ai_with_timeout(self, prompt: str, timeout: int = None) -> Optional[str]:
         """
-        带超时的 Gemini API 调用
+        带超时的 AI API 调用
 
         Args:
             prompt: 提示词
-            timeout: 超时时间（秒），默认使用 GEMINI_TIMEOUT
+            timeout: 超时时间（秒），默认使用 API_TIMEOUT
 
         Returns:
             响应文本，超时或失败返回 None
         """
         if timeout is None:
-            timeout = self.GEMINI_TIMEOUT
+            timeout = self.API_TIMEOUT
 
-        # 定义超时处理器（仅 Unix 系统有效）
-        def timeout_handler(signum, frame):
-            raise TimeoutError(f"Gemini API 调用超时 ({timeout}秒)")
+        # 使用线程池实现真正的超时控制
+        from concurrent.futures import (
+            ThreadPoolExecutor,
+            TimeoutError as FutureTimeoutError,
+        )
+
+        def call_api():
+            try:
+                response = self.ai_client.chat.completions.create(
+                    model="deepseek-chat",
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": "You are a helpful assistant that generates scene detection configurations.",
+                        },
+                        {"role": "user", "content": prompt},
+                    ],
+                    temperature=0.7,
+                    max_tokens=500,
+                )
+                return response.choices[0].message.content.strip()
+            except Exception as e:
+                raise e
 
         try:
-            # 设置信号超时（Unix 系统）
-            old_handler = None
-            if hasattr(signal, "SIGALRM"):
-                old_handler = signal.signal(signal.SIGALRM, timeout_handler)
-                signal.alarm(timeout)
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(call_api)
+                try:
+                    result = future.result(timeout=timeout)
+                    return result
+                except FutureTimeoutError:
+                    print(f"   ⏱️  API 调用超时 ({timeout}秒)")
+                    print(
+                        f"   💡 提示: 可能是网络问题或 API 服务响应慢，建议检查网络连接"
+                    )
+                    return None
 
-            try:
-                # 使用 request_options 设置超时
-                response = self.gemini_model.generate_content(
-                    prompt, request_options={"timeout": timeout}
-                )
-                result = response.text.strip()
-                return result
-            finally:
-                # 恢复信号处理器
-                if hasattr(signal, "SIGALRM"):
-                    signal.alarm(0)  # 取消定时器
-                    if old_handler is not None:
-                        signal.signal(signal.SIGALRM, old_handler)
-
-        except TimeoutError as e:
-            print(f"   ⏱️  {e}")
-            return None
         except Exception as e:
             error_msg = str(e).lower()
             if "timeout" in error_msg or "timed out" in error_msg:
-                print(f"   ⏱️  Gemini API 调用超时 ({timeout}秒)")
+                print(f"   ⏱️  API 调用超时 ({timeout}秒)")
+            elif "429" in error_msg or "quota" in error_msg:
+                print(f"   ⚠️  API 配额已用尽或请求频率过高")
+            elif "403" in error_msg or "401" in error_msg:
+                print(f"   ⚠️  API 密钥无效或权限不足")
+            elif "network" in error_msg or "connection" in error_msg:
+                print(f"   ⚠️  网络连接失败，请检查网络设置")
             else:
-                print(f"   ❌ Gemini API 调用失败: {e}")
+                print(f"   ❌ API 调用失败: {type(e).__name__}: {str(e)[:100]}")
             return None
 
     def load_current_config(self) -> Dict[str, Any]:
@@ -286,16 +287,16 @@ class ConfigUpdater:
                 status = "✅ 启用" if is_enabled else "❌ 禁用"
                 print(f"   {status} {scene_name} -> 使用预定义模板")
             else:
-                # 自定义场景：尝试使用 Gemini 生成配置
-                gemini_config = self.generate_scene_with_gemini(scene_name)
+                # 自定义场景：尝试使用 AI 生成配置
+                ai_config = self.generate_scene_with_ai(scene_name)
 
-                if gemini_config:
-                    scenarios[scene_key] = gemini_config
+                if ai_config:
+                    scenarios[scene_key] = ai_config
                     scenarios[scene_key]["enabled"] = is_enabled
                     status = "✅ 启用" if is_enabled else "❌ 禁用"
-                    print(f"   {status} {scene_name} -> 🤖 Gemini 智能生成")
+                    print(f"   {status} {scene_name} -> 🤖 AI 智能生成")
                 else:
-                    # Gemini 失败，使用默认配置
+                    # AI 失败，使用默认配置
                     scenarios[scene_key] = {
                         "enabled": is_enabled,
                         "name": f"{scene_name}检测",
@@ -344,20 +345,20 @@ class ConfigUpdater:
         # 否则尝试使用 Gemini 翻译
         return self.generate_scene_key_with_gemini(scene_name)
 
-    def add_gemini_support(self, api_key: str) -> None:
+    def add_deepseek_support(self, api_key: str) -> None:
         """
-        添加 Gemini API 支持
+        添加 DeepSeek API 支持
 
         Args:
-            api_key: Gemini API 密钥
+            api_key: DeepSeek API 密钥
         """
-        if not GEMINI_AVAILABLE:
-            print("❌ google-generativeai 未安装，无法启用 Gemini 支持")
-            print("   安装命令: pip install google-generativeai>=0.3.0")
+        if not DEEPSEEK_AVAILABLE:
+            print("❌ openai 未安装，无法启用 AI 支持")
+            print("   安装命令: pip install openai")
             return
 
-        self.GEMINI_API_KEY = api_key
-        self._init_gemini()
+        self.DEEPSEEK_API_KEY = api_key
+        self._init_deepseek()
 
     def calculate_dynamic_threshold(
         self, total_scenarios: int, is_normal: bool = False
@@ -432,11 +433,11 @@ class ConfigUpdater:
             print(f"❌ 重新计算阈值失败: {e}")
             return False
 
-    def generate_scene_with_gemini(
+    def generate_scene_with_ai(
         self, scene_name: str, total_scenarios: int = 3
     ) -> Optional[Dict[str, Any]]:
         """
-        使用 Gemini API 为新场景生成配置
+        使用 DeepSeek API 为新场景生成配置
 
         Args:
             scene_name: 中文场景名称，如 "打架"、"闯入"
@@ -445,8 +446,8 @@ class ConfigUpdater:
         Returns:
             场景配置字典，失败返回 None
         """
-        if not self.gemini_model:
-            print(f"   ⚠️  Gemini 不可用，无法为 '{scene_name}' 生成智能配置")
+        if not self.ai_client:
+            print(f"   ⚠️  AI 不可用，无法为 '{scene_name}' 生成智能配置")
             return None
 
         # 预先计算阈值
@@ -484,14 +485,14 @@ class ConfigUpdater:
 4. 只返回 JSON，不要有任何其他内容（包括注释）"""
 
             print(
-                f"   📡 正在调用 Gemini API 为 '{scene_name}' 生成配置（超时: {self.GEMINI_TIMEOUT}秒）..."
+                f"   📡 正在调用 DeepSeek API 为 '{scene_name}' 生成配置（超时: {self.API_TIMEOUT}秒）..."
             )
 
-            # 使用带超时的 Gemini API 调用
-            response_text = self._call_gemini_with_timeout(prompt)
+            # 使用带超时的 AI API 调用
+            response_text = self._call_ai_with_timeout(prompt)
 
             if response_text is None:
-                print(f"   ⚠️  Gemini 响应超时或失败，将使用默认配置")
+                print(f"   ⚠️  AI 响应超时或失败，将使用默认配置")
                 return None
 
             # 解析 JSON（处理可能的 markdown 代码块）
@@ -542,7 +543,7 @@ class ConfigUpdater:
                 "alert_level": config["alert_level"],
             }
 
-            print(f"   ✅ Gemini 成功生成配置:")
+            print(f"   ✅ DeepSeek 成功生成配置:")
             print(f"      - name: {ordered_config['name']}")
             print(f"      - prompt: {ordered_config['prompt'][:60]}...")
             print(f"      - threshold: {ordered_config['threshold']} (动态计算)")
@@ -551,15 +552,15 @@ class ConfigUpdater:
             return ordered_config
 
         except json.JSONDecodeError as e:
-            print(f"   ❌ Gemini 返回的 JSON 解析失败: {e}")
+            print(f"   ❌ AI 返回的 JSON 解析失败: {e}")
             return None
         except Exception as e:
-            print(f"   ❌ Gemini API 调用失败: {e}")
+            print(f"   ❌ AI API 调用失败: {e}")
             return None
 
-    def generate_scene_key_with_gemini(self, scene_name: str) -> str:
+    def generate_scene_key_with_ai(self, scene_name: str) -> str:
         """
-        使用 Gemini 将中文场景名翻译为英文键
+        使用 AI 将中文场景名翻译为英文键
 
         Args:
             scene_name: 中文场景名称
@@ -567,7 +568,7 @@ class ConfigUpdater:
         Returns:
             英文键（小写+下划线）
         """
-        if not self.gemini_model:
+        if not self.ai_client:
             return self._generate_pinyin_key(scene_name)
 
         try:
@@ -585,7 +586,7 @@ class ConfigUpdater:
 - 打架 -> fight"""
 
             # 使用带超时的调用，翻译任务用较短的超时时间
-            response_text = self._call_gemini_with_timeout(prompt, timeout=8)
+            response_text = self._call_ai_with_timeout(prompt, timeout=8)
 
             if response_text is None:
                 return self._generate_pinyin_key(scene_name)
@@ -718,6 +719,95 @@ class ConfigUpdater:
 
         except Exception as e:
             print(f"❌ 添加场景失败: {e}")
+            import traceback
+
+            traceback.print_exc()
+            return False
+
+    def delete_scenarios_by_names(self, scene_names: List[str]) -> bool:
+        """
+        根据中文名称删除场景
+
+        Args:
+            scene_names: 要删除的场景名称列表（中文，如 ["打架", "闯入"]）
+
+        Returns:
+            是否成功删除
+        """
+        try:
+            print(f"\n{'='*60}")
+            print(f"🗑️  删除场景: {', '.join(scene_names)}")
+            print(f"{'='*60}")
+
+            # 1. 加载当前配置
+            config = self.load_current_config()
+            scenarios = config.get("scenarios", {})
+
+            if not scenarios:
+                print("   ⚠️  配置文件中没有场景")
+                return False
+
+            # 2. 找到对应的场景键
+            keys_to_delete = []
+            for scene_name in scene_names:
+                found = False
+                for key, value in scenarios.items():
+                    if isinstance(value, dict):
+                        config_name = value.get("name", "")
+
+                        # 直接完整匹配，或者去掉两边的"检测"后缀进行匹配
+                        if config_name == scene_name:
+                            keys_to_delete.append(key)
+                            found = True
+                            break
+
+                        # 尝试去掉"检测"后缀匹配（兼容性）
+                        config_name_stripped = (
+                            config_name[:-2]
+                            if config_name.endswith("检测")
+                            else config_name
+                        )
+                        scene_name_stripped = (
+                            scene_name[:-2]
+                            if scene_name.endswith("检测")
+                            else scene_name
+                        )
+
+                        if config_name_stripped == scene_name_stripped:
+                            keys_to_delete.append(key)
+                            found = True
+                            break
+
+                if not found:
+                    print(f"   ⚠️  未找到场景: {scene_name}")
+
+            if not keys_to_delete:
+                print(f"   ⚠️  未找到任何要删除的场景")
+                return False
+
+            # 3. 删除场景
+            deleted_count = 0
+            for key in keys_to_delete:
+                if key in scenarios:
+                    scene_name = scenarios[key].get("name", key)
+                    del scenarios[key]
+                    deleted_count += 1
+                    print(f"   ✓ 已删除: {scene_name} (key: {key})")
+
+            # 4. 保存配置
+            config["scenarios"] = scenarios
+            self.save_config(config)
+
+            # 5. 重新计算所有场景的阈值（因为场景数量变化了）
+            if deleted_count > 0:
+                self.recalculate_all_thresholds()
+
+            print(f"✅ 成功删除 {deleted_count} 个场景！")
+            print(f"{'='*60}\n")
+            return True
+
+        except Exception as e:
+            print(f"❌ 删除场景失败: {e}")
             import traceback
 
             traceback.print_exc()

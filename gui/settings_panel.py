@@ -21,6 +21,9 @@ import os
 # 添加项目根目录到路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.utils.config_updater import ConfigUpdater
+import yaml
+import yaml
+import yaml
 
 
 class SettingsPanel:
@@ -92,10 +95,14 @@ class SettingsPanel:
                     "resolution": "1280x720",
                 }
 
-        # 场景类型列表（引用配置中的数据）
-        self.scene_types: list[str] = self.app_config.get(
+        # 场景类型列表：优先从 YAML 加载，否则使用配置或默认值
+        self.scene_types: list[
+            str
+        ] = self._load_scene_types_from_yaml() or self.app_config.get(
             "scene_types", ["摔倒", "起火"]
         )
+        # 同步到 app_config
+        self.app_config["scene_types"] = self.scene_types
 
         # 场景复选框变量字典 {场景名: BooleanVar}
         self.scene_checkbox_vars: Dict[str, tk.BooleanVar] = {}
@@ -128,6 +135,46 @@ class SettingsPanel:
 
         # 绑定窗口缩放事件
         self.parent.bind("<Configure>", self._on_window_resize)
+
+    def _load_scene_types_from_yaml(self) -> Optional[list[str]]:
+        """从 YAML 配置文件加载场景类型列表
+
+        Returns:
+            场景类型列表，如果加载失败返回 None
+        """
+        try:
+            config_path = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                "config",
+                "detection",
+                "default.yaml",
+            )
+
+            if not os.path.exists(config_path):
+                return None
+
+            with open(config_path, "r", encoding="utf-8") as f:
+                config = yaml.safe_load(f)
+
+            if not config or "scenarios" not in config:
+                return None
+
+            # 从 scenarios 中提取场景名称
+            scenarios = config["scenarios"]
+            scene_types = [
+                scenario.get("name")
+                for scenario in scenarios.values()
+                if scenario.get("name")
+            ]
+
+            if scene_types:
+                print(f"✅ 从 YAML 加载了 {len(scene_types)} 个场景: {scene_types}")
+                return scene_types
+
+        except Exception as e:
+            print(f"⚠️  从 YAML 加载场景失败: {e}")
+
+        return None
 
     def _setup_fonts(self) -> None:
         """配置字体和样式"""
@@ -717,8 +764,23 @@ class SettingsPanel:
         )
         cancel_btn.pack(side=tk.LEFT, padx=15)
 
+        def on_timeout():
+            """超时时的回调"""
+            dialog.destroy()  # 关闭新建场景窗口
+            messagebox.showwarning(
+                "AI 生成超时",
+                "DeepSeek AI 服务响应超时，可能原因：\n\n"
+                "• 网络连接较慢或不稳定\n"
+                "• API 服务响应延迟\n\n"
+                "建议：\n"
+                "1. 检查网络连接\n"
+                "2. 稍后重试\n"
+                "3. 系统已为您创建默认配置",
+                parent=self.parent,
+            )
+
         def on_confirm():
-            """确认创建 - 使用Gemini生成配置"""
+            """确认创建 - 使用DeepSeek AI生成配置"""
             scene_name = scene_name_var.get().strip()
 
             if not scene_name:
@@ -742,6 +804,11 @@ class SettingsPanel:
 
             def generate_scene_config():
                 """在后台线程中生成场景配置"""
+                import time
+
+                timeout_seconds = 35  # 稍长于 ConfigUpdater 的超时时间
+                start_time = time.time()
+
                 try:
                     # 获取配置文件路径
                     config_path = os.path.join(
@@ -758,21 +825,26 @@ class SettingsPanel:
                     current_config = config_updater.load_current_config()
                     current_scenario_count = len(current_config.get("scenarios", {}))
 
-                    # 使用Gemini生成场景配置（传入当前场景数）
-                    scene_config = config_updater.generate_scene_with_gemini(
+                    # 使用 DeepSeek AI 生成场景配置（传入当前场景数）
+                    scene_config = config_updater.generate_scene_with_ai(
                         scene_name, total_scenarios=current_scenario_count
                     )
 
+                    # 检查是否超时
+                    elapsed = time.time() - start_time
+                    if scene_config is None and elapsed > timeout_seconds * 0.8:
+                        # 超时情况：显示提示框并关闭窗口
+                        dialog.after(0, lambda: on_timeout())
+                        return
+
                     if scene_config is None:
-                        # Gemini失败，使用默认配置
+                        # AI 失败但非超时，使用默认配置
                         scene_config = config_updater._generate_default_scene_config(
                             scene_name, total_scenarios=current_scenario_count
                         )
 
                     # 生成场景key
-                    scene_key = config_updater.generate_scene_key_with_gemini(
-                        scene_name
-                    )
+                    scene_key = config_updater.generate_scene_key_with_ai(scene_name)
                     if scene_key is None:
                         # 使用拼音作为备选
                         scene_key = config_updater._generate_pinyin_key(scene_name)
@@ -875,10 +947,42 @@ class SettingsPanel:
         # 确认删除
         scene_list = "\n".join(f"• {s}" for s in selected_scenes)
         result = messagebox.askyesno(
-            "确认删除", f"确定要删除以下场景吗？\n\n{scene_list}\n\n此操作无法撤销。"
+            "确认删除",
+            f"确定要删除以下场景吗？\n\n{scene_list}\n\n此操作将同时删除配置文件中的场景配置，无法撤销。",
         )
 
         if result:
+            # 从配置文件中删除场景
+            try:
+                config_path = os.path.join(
+                    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                    "config",
+                    "detection",
+                    "default.yaml",
+                )
+                config_updater = ConfigUpdater(config_path)
+
+                # 调用配置更新器删除场景
+                success = config_updater.delete_scenarios_by_names(selected_scenes)
+
+                if not success:
+                    messagebox.showerror(
+                        "删除失败",
+                        "配置文件删除失败，请查看控制台输出",
+                    )
+                    return
+
+            except Exception as e:
+                messagebox.showerror(
+                    "删除失败",
+                    f"删除配置文件时出错：\n{str(e)}",
+                )
+                print(f"删除场景配置失败: {e}")
+                import traceback
+
+                traceback.print_exc()
+                return
+
             # 从列表中移除选中的场景
             for scene in selected_scenes:
                 if scene in self.scene_types:
@@ -893,7 +997,10 @@ class SettingsPanel:
             # 重新创建复选框
             self._create_scene_checkboxes()
 
-            messagebox.showinfo("删除成功", f"已成功删除 {len(selected_scenes)} 个场景")
+            messagebox.showinfo(
+                "删除成功",
+                f"已成功删除 {len(selected_scenes)} 个场景\n配置文件已同步更新",
+            )
 
     def _toggle_roi(self) -> None:
         """切换ROI启用状态"""
