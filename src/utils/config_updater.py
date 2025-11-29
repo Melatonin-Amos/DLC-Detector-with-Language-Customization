@@ -33,7 +33,7 @@ class ConfigUpdater:
     """配置更新器 - 负责根据用户选择的场景更新配置文件"""
 
     # DeepSeek API 密钥
-    DEEPSEEK_API_KEY = "sk-cd035e75503c43b48b30edd49de9bf7b"
+    DEEPSEEK_API_KEY = "your_key_here"
 
     # API 超时时间（秒）
     API_TIMEOUT = 30
