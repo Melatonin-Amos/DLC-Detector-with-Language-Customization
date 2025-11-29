@@ -21,7 +21,7 @@ class ChineseTranslator:
     def __init__(
         self,
         api_key: Optional[str] = None,
-        model: str = "gemini-1.5-flash",
+        model: str = "gemini-2.5-flash",
         cache_enabled: bool = True,
     ):
         """
@@ -29,7 +29,7 @@ class ChineseTranslator:
 
         Args:
             api_key: Gemini API密钥
-            model: 使用的模型（建议使用 gemini-1.5-flash 稳定版）
+            model: 使用的模型
             cache_enabled: 是否启用缓存
         """
         self.api_key = api_key
