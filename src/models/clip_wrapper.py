@@ -237,7 +237,7 @@ class CLIPWrapper:
     def predict(self,
                 image: Union[Image.Image, torch.Tensor, np.ndarray],
                 text_prompts: List[str],
-                temperature: float = 1.0) -> Tuple[torch.Tensor, List[float]]:
+                temperature: float = 1.0) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         端到端预测：计算图像与多个文本提示的相似度
         
@@ -249,7 +249,7 @@ class CLIPWrapper:
         Returns:
             (logits, probabilities):
             - logits: 相似度分数张量
-            - probabilities: softmax归一化后的概率列表
+            - probabilities: softmax归一化后的概率张量
         """
         # 编码图像和文本
         image_features = self.encode_image(image)
@@ -261,7 +261,7 @@ class CLIPWrapper:
         # 计算概率（softmax）
         probs = F.softmax(logits, dim=-1)
         
-        return logits[0], probs[0].cpu().tolist()
+        return logits[0], probs[0]
     
     def get_top_predictions(self,
                            image: Union[Image.Image, torch.Tensor, np.ndarray],

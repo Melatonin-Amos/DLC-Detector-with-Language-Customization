@@ -7,15 +7,17 @@ DLC智能养老摄像头主程序
 3. 使用Hydra进行配置管理
 4. 支持中文提示词自动翻译
 
-使用示例：
-    # 摄像头模式（外接USB摄像头）
+运行方式：
+
+1. 纯GUI模式（加载模型，在界面中手动选择视频源）：
+    python main.py mode=gui
+
+2. 摄像头模式（自动打开摄像头）：
     python main.py mode=camera
-    
-    # 使用内置摄像头
-    python main.py mode=camera camera.index=0
-    
-    # 视频文件模式
-    python main.py mode=video video_path=assets/test_videos/fall_detection/test1.mp4
+    python main.py mode=camera camera.index=1
+
+3. 视频文件模式（自动播放指定视频）：
+    python main.py mode=video video_path=path/to/video.mp4
 """
 
 import hydra
@@ -117,15 +119,15 @@ class DLCApplication:
         try:
             from gui.main_window import MainWindow
             
-            # 打开摄像头（使用配置的索引）
-            logger.info(f"正在打开摄像头索引 {self.cfg.camera.index}...")
-            self.video_stream.open_camera()
-            
             # 启动GUI
             gui = MainWindow()
             gui.set_video_stream(self.video_stream)
             gui.set_detector(self.clip_detector)
             gui.set_alert_manager(self.alert_manager)
+            
+            # 设置自动启动摄像头（终端已配置，无需弹出选择对话框）
+            gui.set_auto_start_camera(camera_index=self.cfg.camera.index)
+            
             gui.run()
             
         except ImportError as e:
@@ -148,14 +150,15 @@ class DLCApplication:
         try:
             from gui.main_window import MainWindow
             
-            # 打开视频文件
-            self.video_stream.open_video(video_path)
-            
             # 启动GUI
             gui = MainWindow()
             gui.set_video_stream(self.video_stream)
             gui.set_detector(self.clip_detector)
             gui.set_alert_manager(self.alert_manager)
+            
+            # 设置自动启动视频（终端已配置，无需弹出选择对话框）
+            gui.set_auto_start_video(video_path=video_path)
+            
             gui.run()
             
         except ImportError as e:
@@ -164,10 +167,25 @@ class DLCApplication:
             self._process_stream()
     
     def run_gui_mode(self):
-        """GUI模式已合并到camera/video模式"""
-        logger.warning("⚠️  GUI模式已移除，请使用:")
-        logger.info("  摄像头+GUI: python main.py mode=camera")
-        logger.info("  视频+GUI:   python main.py mode=video video_path=xxx.mp4")
+        """纯GUI模式 - 加载模型后在界面中手动选择视频源"""
+        logger.info("🖥️  启动纯GUI模式")
+        logger.info("模型已加载，请在界面中选择视频源")
+        
+        try:
+            from gui.main_window import MainWindow
+            
+            # 启动GUI（不设置自动启动，由用户在界面中选择）
+            gui = MainWindow()
+            gui.set_video_stream(self.video_stream)
+            gui.set_detector(self.clip_detector)
+            gui.set_alert_manager(self.alert_manager)
+            
+            # 不调用set_auto_start_xxx，用户需要手动点击「开始检测」选择视频源
+            gui.run()
+            
+        except ImportError as e:
+            logger.error(f"❌ GUI模块导入失败: {e}")
+            sys.exit(1)
     
     def _process_stream(self):
         """处理视频流（核心检测循环）"""
@@ -251,7 +269,7 @@ def main(cfg: DictConfig):
             app.run_gui_mode()
         else:
             logger.error(f"❌ 未知的运行模式: {mode}")
-            logger.info("支持的模式: camera | video")
+            logger.info("支持的模式: gui | camera | video")
             sys.exit(1)
     
     except Exception as e:
