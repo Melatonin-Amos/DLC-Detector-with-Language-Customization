@@ -1,26 +1,16 @@
-# @package _global_.detection
-# 默认检测配置
-
-# 全局开关
 enabled: true
 show_results: true
 show_confidence: true
-
-# 场景配置
-# 经测试发现: FG-CLIP对英文描述性prompt效果更好
-# 使用英文prompt进行检测，中文name用于界面显示
 scenarios:
   fall:
     enabled: true
     name: 跌倒检测
-    # 英文描述性prompt，效果最佳(测试准确率0.95+)
     prompt: a person has fallen and is lying on the floor
     prompt_cn: 有人摔倒躺在地上
     threshold: 0.4
     cooldown: 30
     consecutive_frames: 2
     alert_level: high
-  
   fire:
     enabled: true
     name: 火灾检测
@@ -30,9 +20,8 @@ scenarios:
     cooldown: 60
     consecutive_frames: 3
     alert_level: high
-  
   normal:
-    enabled: true
+    enabled: false
     name: 正常场景
     prompt: an ordinary indoor room with no emergency
     prompt_cn: 普通室内环境，无异常

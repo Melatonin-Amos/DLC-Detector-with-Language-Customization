@@ -14,7 +14,7 @@
 import sys
 import os
 
-# 添加项目根目录到 Python 路径（解决模块导入问题）
+# 添加项目根目录到 Python 路径（必须在其他导入之前）
 if __name__ == "__main__":
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -43,8 +43,9 @@ class MainWindow:
     # 类常量
     VIDEO_RATIO = 16 / 9  # 视频显示比例
     SCREEN_RATIO = 0.75  # 窗口占屏幕比例
-    VIDEO_CANVAS_WIDTH = 720  # 固定视频画布宽度
-    VIDEO_CANVAS_HEIGHT = 405  # 固定视频画布高度（16:9）
+    VIDEO_CANVAS_WIDTH = 880  # 固定视频画布宽度（加大）
+    VIDEO_CANVAS_HEIGHT = 495  # 固定视频画布高度（16:9）
+    ALERT_PANEL_WIDTH = 220  # 警报面板宽度（加宽）
 
     def __init__(self) -> None:
         """初始化主窗口"""
@@ -131,6 +132,17 @@ class MainWindow:
         self.playback_speed: float = 1.0
         self.video_finished: bool = False
 
+        # 警报相关变量
+        self.is_alert_active: bool = False  # 是否有警报
+        self.alert_flash_id: Optional[str] = None  # 闪烁定时器ID
+        self.alert_flash_state: bool = False  # 闪烁状态
+        self.alert_history: list = []  # 警报历史记录
+
+        # 自动启动相关（从终端传入的配置）
+        self._auto_start_mode: Optional[str] = None  # 'camera' 或 'video'
+        self._auto_start_camera_index: int = 0
+        self._auto_start_video_path: Optional[str] = None
+
         # 初始化GUI组件
         self._setup_window()
         self._setup_icon()
@@ -200,8 +212,8 @@ class MainWindow:
 
     def _create_widgets(self) -> None:
         """创建所有GUI组件"""
-        # 创建主框架
-        self.main_frame = ttk.Frame(self.root, padding="20")
+        # 创建主框架（减小padding让内容更饱满）
+        self.main_frame = ttk.Frame(self.root, padding="10")
         self.main_frame.grid(row=0, column=0, sticky="nsew")
         self.main_frame.grid_rowconfigure(1, weight=1)  # 视频区域可扩展
         self.main_frame.grid_columnconfigure(0, weight=1)
@@ -209,8 +221,15 @@ class MainWindow:
         # 创建顶部标题区域（Logo + 标题）
         self._create_header()
 
-        # 创建视频显示区域
+        # 创建视频和警报的水平容器
+        self.content_frame = ttk.Frame(self.main_frame)
+        self.content_frame.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
+
+        # 创建视频显示区域（左侧）
         self._create_video_frame()
+
+        # 创建警报面板（右侧）
+        self._create_alert_frame()
 
         # 创建进度条区域
         self._create_progress_bar()
@@ -254,40 +273,37 @@ class MainWindow:
             )
             placeholder.place(relx=0.5, rely=0.5, anchor="center")
 
-        # 艺术标题（中间）- 使用 tk.Label，设置背景透明
-        title_container = ttk.Frame(header_frame)
-        title_container.grid(row=0, column=1, sticky="w")
-
-        # 获取父容器背景色，确保无阴影
-        bg_color = self.root.cget("bg")
-
-        self.title_label = tk.Label(
-            title_container,
+        # 艺术标题（中间）- 直接使用 ttk.Label，无边框
+        self.title_label = ttk.Label(
+            header_frame,
             text="DLC：支持语义客制化的智能养老摄像头",
             font=self.fonts["header"],
-            fg="#2c3e50",
-            bg=bg_color,
-            bd=0,
-            highlightthickness=0,
-            relief=tk.FLAT,
+            foreground="#2c3e50",
         )
-        self.title_label.pack(anchor="w")
+        self.title_label.grid(row=0, column=1, sticky="w")
 
     def _create_video_frame(self) -> None:
-        """创建视频显示区域"""
-        self.video_frame = ttk.LabelFrame(
-            self.main_frame, text="📹 实时视频预览", padding="10"
-        )
-        self.video_frame.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
+        """创建视频显示区域（左侧）"""
+        # 视频区域容器
+        self.video_frame = ttk.Frame(self.content_frame, padding="5")
+        self.video_frame.pack(side=tk.LEFT, fill=tk.BOTH)
 
-        # 视频画布
+        # 视频预览标签
+        video_title = ttk.Label(
+            self.video_frame, text="📹 实时视频预览", font=self.fonts["title"]
+        )
+        video_title.pack(anchor="w", pady=(0, 5))
+
+        # 视频画布 - 使用固定尺寸
         self.video_canvas = tk.Canvas(
             self.video_frame,
             bg="#2b2b2b",
             highlightthickness=2,
             highlightbackground="#4a4a4a",
+            width=self.VIDEO_CANVAS_WIDTH,
+            height=self.VIDEO_CANVAS_HEIGHT,
         )
-        self.video_canvas.pack(padx=5, pady=5, expand=True, fill=tk.BOTH)
+        self.video_canvas.pack(padx=5, pady=5)
 
         # 占位提示文字（初始居中）
         self.placeholder_text = self.video_canvas.create_text(
@@ -301,6 +317,56 @@ class MainWindow:
 
         # 重播按钮（初始隐藏）
         self.replay_button = None
+
+    def _create_alert_frame(self) -> None:
+        """创建警报面板（右侧）"""
+        # 警报区域容器
+        self.alert_frame = ttk.Frame(self.content_frame, padding="5")
+        self.alert_frame.pack(side=tk.LEFT, fill=tk.BOTH, padx=(10, 0))
+
+        # 警报标题
+        alert_title = ttk.Label(
+            self.alert_frame, text="🚨 警报信息", font=self.fonts["title"]
+        )
+        alert_title.pack(anchor="w", pady=(0, 5))
+
+        # 警报画布 - 与视频画布同高
+        self.alert_canvas = tk.Canvas(
+            self.alert_frame,
+            bg="#1a1a2e",
+            highlightthickness=3,
+            highlightbackground="#3498db",  # 蓝色边框（正常状态）
+            width=self.ALERT_PANEL_WIDTH,
+            height=self.VIDEO_CANVAS_HEIGHT,
+        )
+        self.alert_canvas.pack(padx=5, pady=5)
+
+        # 警报标题（顶部居中）
+        self.alert_title = self.alert_canvas.create_text(
+            self.ALERT_PANEL_WIDTH // 2,
+            25,
+            text="警报信息",
+            font=(self.font_family, 18, "bold"),
+            fill="#3498db",
+            justify="center",
+        )
+
+        # 分隔线
+        self.alert_canvas.create_line(
+            10, 50, self.ALERT_PANEL_WIDTH - 10, 50, fill="#4a4a4a", width=1
+        )
+
+        # 警报内容文字（从顶部开始，左对齐）
+        self.alert_text = self.alert_canvas.create_text(
+            15,
+            65,
+            text="暂无警报记录",
+            font=(self.font_family, 11, "bold"),
+            fill="#3498db",  # 蓝色文字
+            justify="left",
+            anchor="nw",  # 左上角对齐
+            width=self.ALERT_PANEL_WIDTH - 30,  # 文字换行宽度
+        )
 
     def _create_progress_bar(self) -> None:
         """创建进度条区域"""
@@ -1081,8 +1147,178 @@ class MainWindow:
                     else:
                         print("❌ 配置文件更新失败")
 
+    # ==================== 自动启动方法（终端命令模式） ====================
+
+    def set_auto_start_camera(self, camera_index: int = 0) -> None:
+        """
+        设置自动启动摄像头模式（终端配置）
+
+        Args:
+            camera_index: 摄像头索引
+        """
+        self._auto_start_mode = "camera"
+        self._auto_start_camera_index = camera_index
+        print(f"✓ 设置自动启动摄像头模式，索引: {camera_index}")
+
+    def set_auto_start_video(self, video_path: str) -> None:
+        """
+        设置自动启动视频模式（终端配置）
+
+        Args:
+            video_path: 视频文件路径
+        """
+        self._auto_start_mode = "video"
+        self._auto_start_video_path = video_path
+        print(f"✓ 设置自动启动视频模式，路径: {video_path}")
+
+    def _execute_auto_start(self) -> None:
+        """执行自动启动（在GUI初始化完成后调用）"""
+        if self._auto_start_mode == "camera":
+            print(f"🎬 自动启动摄像头 (索引: {self._auto_start_camera_index})...")
+            # 更新配置中的摄像头索引
+            self.app_config["camera"]["camera_index"] = str(
+                self._auto_start_camera_index
+            )
+            # 直接启动摄像头，不弹对话框
+            self._start_camera_stream()
+
+        elif self._auto_start_mode == "video" and self._auto_start_video_path:
+            print(f"🎬 自动启动视频: {self._auto_start_video_path}...")
+            # 直接启动视频，不弹对话框
+            self.current_video_path = self._auto_start_video_path
+            self.is_local_video = True
+            self._start_local_video_stream(self._auto_start_video_path)
+
+    # ==================== 警报相关方法 ====================
+
+    def trigger_alert_with_result(self, result: dict) -> None:
+        """
+        根据检测结果触发警报，累积显示
+
+        Args:
+            result: 检测结果字典，包含 scenario_name, confidence, alert_level 等
+        """
+        import time
+
+        # 添加时间戳
+        alert_record = {
+            "time": time.strftime("%H:%M:%S"),
+            "scenario_name": result.get("scenario_name", "未知"),
+            "confidence": result.get("confidence", 0),
+            "alert_level": result.get("alert_level", "medium"),
+        }
+
+        # 添加到历史记录（最新的在前面）
+        self.alert_history.insert(0, alert_record)
+
+        # 限制历史记录数量（最多保留最新10条）
+        if len(self.alert_history) > 10:
+            self.alert_history = self.alert_history[:10]
+
+        self.is_alert_active = True
+        self._update_alert_display()
+        self._start_alert_flash()
+
+    def _delayed_clear_alert(self) -> None:
+        """延迟清除警报（已禁用）"""
+        pass  # 不再自动清除
+
+    def trigger_alert(self, message: str = "检测到异常，请及时处理！") -> None:
+        """
+        触发警报 - 显示红色闪烁效果（简单消息版本）
+
+        Args:
+            message: 警报信息
+        """
+        if not self.is_alert_active:
+            self.is_alert_active = True
+            self.alert_message = message
+            self.alert_result = None  # 没有详细结果
+            self._update_alert_display()
+            self._start_alert_flash()
+
+    def clear_alert(self) -> None:
+        """清除警报 - 恢复蓝色正常状态"""
+        if self.is_alert_active:
+            self.is_alert_active = False
+            self._stop_alert_flash()
+            self._update_alert_display()
+
+    def _update_alert_display(self) -> None:
+        """更新警报显示内容（显示历史记录）"""
+        if self.is_alert_active and self.alert_history:
+            # 更新标题颜色为红色
+            self.alert_canvas.itemconfig(self.alert_title, fill="#e74c3c")
+
+            # 构建警报历史文本
+            lines = []
+
+            # 显示最近的警报（最多显示4条）
+            for i, record in enumerate(self.alert_history[:4]):
+                if i > 0:
+                    lines.append("")  # 警报之间空一行
+                lines.append(f"警报类型: {record['scenario_name']}")
+                lines.append(f"检测时间: {record['time']}")
+                lines.append(f"可能性: {record['confidence']:.1%}")
+
+            # 如果有更多记录
+            if len(self.alert_history) > 4:
+                lines.append("")
+                lines.append(f"... 还有 {len(self.alert_history) - 4} 条记录")
+
+            alert_text = "\n".join(lines)
+
+            # 警报状态 - 红色
+            self.alert_canvas.itemconfig(
+                self.alert_text, text=alert_text, fill="#e74c3c"  # 红色文字
+            )
+        else:
+            # 正常状态 - 蓝色
+            self.alert_canvas.itemconfig(self.alert_title, fill="#3498db")
+            self.alert_canvas.itemconfig(
+                self.alert_text, text="暂无警报记录", fill="#3498db"  # 蓝色文字
+            )
+            self.alert_canvas.config(highlightbackground="#3498db")  # 蓝色边框
+
+    def _start_alert_flash(self) -> None:
+        """开始警报闪烁"""
+        self._do_alert_flash()
+
+    def _do_alert_flash(self) -> None:
+        """执行警报闪烁效果"""
+        if not self.is_alert_active:
+            return
+
+        # 切换闪烁状态
+        self.alert_flash_state = not self.alert_flash_state
+
+        if self.alert_flash_state:
+            # 高亮状态 - 明亮红色
+            self.alert_canvas.config(highlightbackground="#ff4444")
+            self.alert_canvas.config(bg="#2d1f1f")  # 微红背景
+        else:
+            # 暗淡状态 - 深红色
+            self.alert_canvas.config(highlightbackground="#992222")
+            self.alert_canvas.config(bg="#1a1a2e")  # 正常背景
+
+        # 500ms后再次调用（闪烁频率）
+        self.alert_flash_id = self.root.after(500, self._do_alert_flash)
+
+    def _stop_alert_flash(self) -> None:
+        """停止警报闪烁"""
+        if self.alert_flash_id:
+            self.root.after_cancel(self.alert_flash_id)
+            self.alert_flash_id = None
+        self.alert_flash_state = False
+        # 恢复正常背景
+        self.alert_canvas.config(bg="#1a1a2e")
+
     def run(self) -> None:
         """运行主窗口"""
+        # 如果设置了自动启动模式，延迟执行（等待GUI完全初始化）
+        if self._auto_start_mode:
+            self.root.after(500, self._execute_auto_start)
+
         self.root.mainloop()
 
 
