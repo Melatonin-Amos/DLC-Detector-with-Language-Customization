@@ -130,11 +130,9 @@ DLC-Detector-with-Language-Customization/
 ├── assets/                     # 资源文件
 │   └── test_videos/            # 测试视频
 │
-├── docs/                       # 文档
-│   ├── FG_CLIP_GUIDE.md        # FG-CLIP 使用指南
-│   └── PROMPT_OPTIMIZATION.md  # Prompt 优化指南
-│
-└── tests/                      # 单元测试
+└── docs/                       # 文档
+    ├── FG_CLIP_GUIDE.md        # FG-CLIP 使用指南
+    └── PROMPT_OPTIMIZATION.md  # Prompt 优化指南
 ```
 
 ## 配置说明
@@ -235,9 +233,6 @@ black src/ gui/ tests/
 
 # 代码检查
 flake8 src/ gui/
-
-# 运行测试
-pytest tests/ -v
 ```
 
 ### 添加新检测场景
@@ -336,7 +331,7 @@ export DEEPSEEK_API_KEY="your_key"
 
   - 隐私保护：在边缘设备+服务器的计算情境，如何保持摄像头视觉信息可能携带的用户隐私的安全性？您可以尝试使用稀疏视觉输入。
   - 更加开盒即用：可以简化当前的运行逻辑，把更多自由度交给GUI
-  - 跨终端GUI与应用：可以开发针对Ubuntu、安卓、iOS的GUI和通讯、计算机制
+  - 跨终端GUI与应用：可以开发针对Linux、安卓、iOS的GUI和通讯、计算机制
 
 
 
