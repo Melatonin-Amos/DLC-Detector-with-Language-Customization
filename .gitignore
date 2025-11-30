@@ -81,3 +81,6 @@ data/.translation_cache.json
 # 警报输出
 data/outputs/alerts/
 data/logs/
+
+# 开发用文件
+docs/FG_CLIP_notebook.md

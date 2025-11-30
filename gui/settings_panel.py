@@ -20,9 +20,7 @@ import os
 
 # 添加项目根目录到路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from src.utils.config_updater import ConfigUpdater
-import yaml
-import yaml
+from src.utils.config_updater import ConfigUpdater, PROTECTED_SCENE_NAMES
 import yaml
 
 
@@ -95,6 +93,13 @@ class SettingsPanel:
                     "resolution": "1280x720",
                 }
 
+        # 初始化 ConfigUpdater（复用实例，避免重复创建）
+        self._config_updater: Optional[ConfigUpdater] = None
+        self._init_config_updater()
+        
+        # 场景变化回调（用于通知外部组件，如检测器热重载）
+        self._on_scenarios_changed_callback: Optional[Callable] = None
+
         # 场景类型列表：优先从 YAML 加载，否则使用配置或默认值
         self.scene_types: list[
             str
@@ -136,6 +141,52 @@ class SettingsPanel:
         # 绑定窗口缩放事件
         self.parent.bind("<Configure>", self._on_window_resize)
 
+    def _init_config_updater(self) -> None:
+        """初始化配置更新器实例（带异常处理）"""
+        try:
+            config_path = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                "config",
+                "detection",
+                "default.yaml",
+            )
+            self._config_updater = ConfigUpdater(config_path)
+        except FileNotFoundError as e:
+            print(f"⚠️  配置文件不存在: {e}")
+            self._config_updater = None
+        except Exception as e:
+            print(f"⚠️  ConfigUpdater 初始化失败: {e}")
+            self._config_updater = None
+
+    def get_config_updater(self) -> Optional[ConfigUpdater]:
+        """
+        获取配置更新器实例（安全访问）
+        
+        Returns:
+            ConfigUpdater 实例，若不可用则返回 None
+        """
+        return self._config_updater
+
+    def set_scenarios_changed_callback(self, callback: Callable) -> None:
+        """
+        设置场景变化回调函数
+        
+        当场景配置发生变化时（新增、删除、启用/禁用），
+        会调用此回调通知外部组件（如检测器）进行热重载。
+        
+        Args:
+            callback: 回调函数，无参数
+        """
+        self._on_scenarios_changed_callback = callback
+
+    def _notify_scenarios_changed(self) -> None:
+        """通知外部组件场景配置已变化"""
+        if self._on_scenarios_changed_callback:
+            try:
+                self._on_scenarios_changed_callback()
+            except Exception as e:
+                print(f"⚠️  场景变化回调执行失败: {e}")
+
     def _load_scene_types_from_yaml(self) -> Optional[list[str]]:
         """从 YAML 配置文件加载场景类型列表
 
@@ -159,16 +210,23 @@ class SettingsPanel:
             if not config or "scenarios" not in config:
                 return None
 
-            # 从 scenarios 中提取场景名称
+            # 从 scenarios 中提取场景名称和启用状态
             scenarios = config["scenarios"]
-            scene_types = [
-                scenario.get("name")
-                for scenario in scenarios.values()
-                if scenario.get("name")
-            ]
+            scene_types = []
+            enabled_scenes = []
+            
+            for scenario in scenarios.values():
+                name = scenario.get("name")
+                if name:
+                    scene_types.append(name)
+                    # 收集已启用的场景
+                    if scenario.get("enabled", False):
+                        enabled_scenes.append(name)
 
             if scene_types:
-                print(f"✅ 从 YAML 加载了 {len(scene_types)} 个场景: {scene_types}")
+                # 同步已启用的场景到 app_config
+                if enabled_scenes and "scene" in self.app_config:
+                    self.app_config["scene"]["selected_scenes"] = enabled_scenes
                 return scene_types
 
         except Exception as e:
@@ -671,8 +729,6 @@ class SettingsPanel:
             if self.scene_types:
                 self.app_config["scene"]["scene_type"] = self.scene_types[0]
 
-        print(f"已选中的场景: {selected}")
-
     def show_page(self, page_name: str) -> None:
         """
         显示指定的设置页面
@@ -795,11 +851,25 @@ class SettingsPanel:
                 )
                 return
 
+            # 检查 ConfigUpdater 是否可用
+            if self._config_updater is None:
+                messagebox.showerror(
+                    "配置错误",
+                    "配置更新器不可用，请检查配置文件是否存在",
+                    parent=dialog,
+                )
+                return
+
             # 禁用按钮，显示加载状态
             confirm_btn.config(state=tk.DISABLED)
             cancel_btn.config(state=tk.DISABLED)
             name_entry.config(state=tk.DISABLED)
-            status_label.config(text="🤖 AI正在生成场景配置，请稍候...")
+            
+            # 根据 AI 可用性显示不同提示
+            if self._config_updater.is_ai_available():
+                status_label.config(text="🤖 AI正在生成场景配置，请稍候...")
+            else:
+                status_label.config(text="⚙️ 正在生成默认配置...")
             dialog.update()
 
             def generate_scene_config():
@@ -810,22 +880,14 @@ class SettingsPanel:
                 start_time = time.time()
 
                 try:
-                    # 获取配置文件路径
-                    config_path = os.path.join(
-                        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                        "config",
-                        "detection",
-                        "default.yaml",
-                    )
-
-                    # 创建ConfigUpdater并使用Gemini生成配置
-                    config_updater = ConfigUpdater(config_path)
+                    # 复用已初始化的 config_updater
+                    config_updater = self._config_updater
 
                     # 获取当前场景数量（用于计算阈值）
                     current_config = config_updater.load_current_config()
                     current_scenario_count = len(current_config.get("scenarios", {}))
 
-                    # 使用 DeepSeek AI 生成场景配置（传入当前场景数）
+                    # 使用 AI 生成场景配置（传入当前场景数）
                     scene_config = config_updater.generate_scene_with_ai(
                         scene_name, total_scenarios=current_scenario_count
                     )
@@ -838,19 +900,19 @@ class SettingsPanel:
                         return
 
                     if scene_config is None:
-                        # AI 失败但非超时，使用默认配置
+                        # AI 失败或不可用，使用默认配置
                         scene_config = config_updater._generate_default_scene_config(
                             scene_name, total_scenarios=current_scenario_count
                         )
 
-                    # 生成场景key
+                    # 生成场景key（已内置 fallback 到拼音）
                     scene_key = config_updater.generate_scene_key_with_ai(scene_name)
-                    if scene_key is None:
-                        # 使用拼音作为备选
-                        scene_key = config_updater._generate_pinyin_key(scene_name)
 
                     # 确保enabled为True（新创建的场景默认启用）
                     scene_config["enabled"] = True
+                    
+                    # 获取场景显示名称
+                    display_name = scene_config.get("name", scene_name)
 
                     # 直接添加到配置文件（会自动重新计算所有阈值）
                     success = config_updater.add_new_scenario(scene_key, scene_config)
@@ -858,7 +920,7 @@ class SettingsPanel:
                     # 回到主线程更新UI
                     dialog.after(
                         0,
-                        lambda: on_generation_complete(success, scene_name, scene_key),
+                        lambda: on_generation_complete(success, display_name, scene_key),
                     )
 
                 except Exception as e:
@@ -883,6 +945,9 @@ class SettingsPanel:
 
                     # 通知场景变化（触发配置更新）
                     self._on_scene_checkbox_change()
+                    
+                    # 通知外部组件（如检测器）进行热重载
+                    self._notify_scenarios_changed()
 
                     messagebox.showinfo(
                         "创建成功",
@@ -933,14 +998,13 @@ class SettingsPanel:
             messagebox.showwarning("未选择场景", "请先勾选要删除的场景")
             return
 
-        # 检查是否包含内置场景
-        builtin_scenes = ["摔倒", "起火"]
-        builtin_selected = [s for s in selected_scenes if s in builtin_scenes]
+        # 检查是否包含内置场景（使用统一的 PROTECTED_SCENE_NAMES 常量）
+        builtin_selected = [s for s in selected_scenes if s in PROTECTED_SCENE_NAMES]
 
         if builtin_selected:
             messagebox.showwarning(
                 "无法删除",
-                f"以下场景是内置场景，无法删除：\n{', '.join(builtin_selected)}\n\n请取消勾选后再试",
+                f"以下场景是内置场景，无法删除：\n{', '.join(builtin_selected)}\n\n内置场景包括：跌倒检测、火灾检测、正常场景",
             )
             return
 
@@ -952,18 +1016,18 @@ class SettingsPanel:
         )
 
         if result:
+            # 检查 ConfigUpdater 是否可用
+            if self._config_updater is None:
+                messagebox.showerror(
+                    "配置错误",
+                    "配置更新器不可用，请检查配置文件是否存在",
+                )
+                return
+            
             # 从配置文件中删除场景
             try:
-                config_path = os.path.join(
-                    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                    "config",
-                    "detection",
-                    "default.yaml",
-                )
-                config_updater = ConfigUpdater(config_path)
-
-                # 调用配置更新器删除场景
-                success = config_updater.delete_scenarios_by_names(selected_scenes)
+                # 复用已初始化的 config_updater
+                success = self._config_updater.delete_scenarios_by_names(selected_scenes)
 
                 if not success:
                     messagebox.showerror(
@@ -996,6 +1060,12 @@ class SettingsPanel:
 
             # 重新创建复选框
             self._create_scene_checkboxes()
+            
+            # 触发场景变化回调（通知配置更新）
+            self._on_scene_checkbox_change()
+            
+            # 通知外部组件（如检测器）进行热重载
+            self._notify_scenarios_changed()
 
             messagebox.showinfo(
                 "删除成功",
@@ -1494,63 +1564,18 @@ class SettingsPanel:
             self.parent.after(self._monitor_interval, self._check_config_changes)
 
     def _print_config_diff(self, old_config: Dict, new_config: Dict) -> None:
-        """内部方法：打印配置变化的详细信息"""
-        print("\n" + "🔄" * 30)
-        print("检测到配置变化！")
-        print("🔄" * 30)
-
-        changes = []
-
-        # 检查场景类型变化
-        if old_config.get("scene_type") != new_config.get("scene_type"):
-            changes.append(
-                f"🎯 场景类型: {old_config.get('scene_type')} → {new_config.get('scene_type')}"
-            )
-
+        """内部方法：打印配置变化的简洁信息"""
         # 检查选中场景列表变化
         old_scenes = set(old_config.get("selected_scenes", []))
         new_scenes = set(new_config.get("selected_scenes", []))
+        
         if old_scenes != new_scenes:
             added = new_scenes - old_scenes
             removed = old_scenes - new_scenes
             if added:
-                changes.append(f"📌 新增场景: {', '.join(added)}")
+                print(f"  ✅ 启用: {', '.join(added)}")
             if removed:
-                changes.append(f"📌 移除场景: {', '.join(removed)}")
-            if not added and not removed:
-                changes.append(f"📌 场景顺序已改变")
-
-        # 检查其他参数变化
-        param_names = {
-            "confidence_threshold": "置信度阈值",
-            "detection_interval": "检测间隔",
-            "camera_id": "摄像头ID",
-            "alert_delay": "告警延迟",
-            "light_condition": "光照条件",
-            "enable_roi": "启用ROI",
-            "enable_sound": "声音报警",
-            "enable_email": "邮件通知",
-            "auto_record": "自动录像",
-        }
-
-        for key, name in param_names.items():
-            old_val = old_config.get(key)
-            new_val = new_config.get(key)
-            if old_val != new_val:
-                # 布尔值转换为中文
-                if isinstance(old_val, bool):
-                    old_val = "是" if old_val else "否"
-                    new_val = "是" if new_val else "否"
-                changes.append(f"⚙️  {name}: {old_val} → {new_val}")
-
-        # 打印所有变化
-        if changes:
-            for change in changes:
-                print(f"  {change}")
-        else:
-            print("  (未检测到具体变化，可能是内部状态更新)")
-
-        print("🔄" * 30 + "\n")
+                print(f"  ❌ 禁用: {', '.join(removed)}")
 
     def _print_config(self) -> None:
         """内部方法：打印完整的配置信息"""
@@ -1606,7 +1631,6 @@ class SettingsPanel:
         # 通过设置一个标志来停止监听
         if hasattr(self, "_monitor_callback"):
             self._monitor_callback = None
-            print("✅ 配置监听器已停止")
 
     def _on_window_resize(self, event: tk.Event) -> None:
         """窗口缩放事件处理器，保持窗口宽高比 (3:2)"""

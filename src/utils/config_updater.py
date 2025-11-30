@@ -4,10 +4,14 @@
 功能：
 - 监听场景选择变化
 - 更新 config/detection/default.yaml 的 scenarios 配置
-- 使用 Gemini API 生成规范的场景配置格式
+- 使用多种 LLM API（优先 Gemini，备选 DeepSeek）生成规范的场景配置格式
 
 主要类：
 - ConfigUpdater: 配置更新器类
+
+支持的 LLM API：
+1. Google Gemini（优先）
+2. DeepSeek
 """
 
 import yaml
@@ -18,25 +22,47 @@ import signal
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
+# Gemini API 支持（可选依赖）
+try:
+    import google.generativeai as genai
+    GEMINI_AVAILABLE = True
+except ImportError:
+    GEMINI_AVAILABLE = False
+
 # DeepSeek API 支持（可选依赖）
 try:
     from openai import OpenAI
-
     DEEPSEEK_AVAILABLE = True
 except ImportError:
     DEEPSEEK_AVAILABLE = False
-    print("⚠️  openai 未安装，AI 生成功能不可用")
-    print("   安装命令: pip install openai")
+
+# 提示用户安装情况
+if not GEMINI_AVAILABLE and not DEEPSEEK_AVAILABLE:
+    print("⚠️  未安装任何 LLM API 支持，AI 生成功能不可用")
+    print("   推荐安装 Gemini: pip install google-generativeai")
+    print("   或安装 DeepSeek: pip install openai")
+
+# 内置场景保护列表（这些场景不能被删除）
+PROTECTED_SCENE_KEYS = {"fall", "fire", "normal"}
+PROTECTED_SCENE_NAMES = {
+    "摔倒", "跌倒", "跌倒检测",  # fall 的别名
+    "起火", "火灾", "火灾检测",  # fire 的别名
+    "正常", "正常场景",          # normal 的别名
+}
 
 
 class ConfigUpdater:
     """配置更新器 - 负责根据用户选择的场景更新配置文件"""
 
-    # DeepSeek API 密钥
-    DEEPSEEK_API_KEY = "your_key_here"
+    # API 密钥配置
+    GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+    DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 
     # API 超时时间（秒）
     API_TIMEOUT = 30
+    
+    # 当前使用的 API 类型
+    current_api: str = None  # "gemini", "deepseek", or None
 
     def __init__(self, config_path: str = "config/detection/default.yaml"):
         """
@@ -53,28 +79,60 @@ class ConfigUpdater:
         if not self.config_file.exists():
             raise FileNotFoundError(f"配置文件不存在: {self.config_file}")
 
-        # 初始化 DeepSeek 客户端
+        # 初始化 LLM 客户端（优先 Gemini，备选 DeepSeek）
         self.ai_client = None
-        if DEEPSEEK_AVAILABLE and self.DEEPSEEK_API_KEY:
-            self._init_deepseek()
+        self.gemini_model = None
+        self._init_llm_client()
 
         print(f"✓ 配置更新器初始化: {self.config_file}")
 
+    def _init_llm_client(self) -> None:
+        """初始化 LLM 客户端（优先 Gemini，备选 DeepSeek）"""
+        # 1. 优先尝试 Gemini
+        if GEMINI_AVAILABLE and self.GEMINI_API_KEY:
+            try:
+                genai.configure(api_key=self.GEMINI_API_KEY)
+                self.gemini_model = genai.GenerativeModel('gemini-2.0-flash')
+                self.current_api = "gemini"
+                print("✓ Gemini API 初始化成功（优先使用）")
+                return
+            except Exception as e:
+                print(f"⚠️  Gemini API 初始化失败: {e}")
+        
+        # 2. 回退到 DeepSeek
+        if DEEPSEEK_AVAILABLE and self.DEEPSEEK_API_KEY:
+            try:
+                self.ai_client = OpenAI(
+                    api_key=self.DEEPSEEK_API_KEY, 
+                    base_url="https://api.deepseek.com"
+                )
+                self.current_api = "deepseek"
+                print("✓ DeepSeek API 初始化成功（备选）")
+                return
+            except Exception as e:
+                print(f"⚠️  DeepSeek API 初始化失败: {e}")
+        
+        # 3. 无可用 API
+        print("ℹ️  无可用 LLM API，将使用预定义模板生成配置")
+        self.current_api = None
+
     def _init_deepseek(self) -> None:
-        """初始化 DeepSeek API 客户端"""
-        try:
-            self.ai_client = OpenAI(
-                api_key=self.DEEPSEEK_API_KEY, base_url="https://api.deepseek.com"
-            )
-            print("✓ DeepSeek API 初始化成功")
-        except Exception as e:
-            print(f"⚠️  DeepSeek API 初始化失败: {e}")
-            print(f"   提示: 检查网络连接和 API 密钥是否正确")
-            self.ai_client = None
+        """初始化 DeepSeek API 客户端（兼容旧代码）"""
+        if DEEPSEEK_AVAILABLE and self.DEEPSEEK_API_KEY:
+            try:
+                self.ai_client = OpenAI(
+                    api_key=self.DEEPSEEK_API_KEY, 
+                    base_url="https://api.deepseek.com"
+                )
+                self.current_api = "deepseek"
+                print("✓ DeepSeek API 初始化成功")
+            except Exception as e:
+                print(f"⚠️  DeepSeek API 初始化失败: {e}")
+                self.ai_client = None
 
     def _call_ai_with_timeout(self, prompt: str, timeout: int = None) -> Optional[str]:
         """
-        带超时的 AI API 调用
+        带超时的 AI API 调用（自动选择可用的 API）
 
         Args:
             prompt: 提示词
@@ -86,11 +144,59 @@ class ConfigUpdater:
         if timeout is None:
             timeout = self.API_TIMEOUT
 
-        # 使用线程池实现真正的超时控制
-        from concurrent.futures import (
-            ThreadPoolExecutor,
-            TimeoutError as FutureTimeoutError,
-        )
+        # 根据当前 API 类型选择调用方式
+        if self.current_api == "gemini" and self.gemini_model:
+            return self._call_gemini_with_timeout(prompt, timeout)
+        elif self.current_api == "deepseek" and self.ai_client:
+            return self._call_deepseek_with_timeout(prompt, timeout)
+        else:
+            return None
+
+    def _call_gemini_with_timeout(self, prompt: str, timeout: int) -> Optional[str]:
+        """
+        带超时的 Gemini API 调用
+
+        Args:
+            prompt: 提示词
+            timeout: 超时时间（秒）
+
+        Returns:
+            响应文本，超时或失败返回 None
+        """
+        from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
+
+        def call_api():
+            try:
+                response = self.gemini_model.generate_content(prompt)
+                return response.text.strip()
+            except Exception as e:
+                raise e
+
+        try:
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(call_api)
+                try:
+                    result = future.result(timeout=timeout)
+                    return result
+                except FutureTimeoutError:
+                    print(f"   ⏱️  Gemini API 调用超时 ({timeout}秒)")
+                    return None
+        except Exception as e:
+            self._handle_api_error(e, "Gemini")
+            return None
+
+    def _call_deepseek_with_timeout(self, prompt: str, timeout: int) -> Optional[str]:
+        """
+        带超时的 DeepSeek API 调用
+
+        Args:
+            prompt: 提示词
+            timeout: 超时时间（秒）
+
+        Returns:
+            响应文本，超时或失败返回 None
+        """
+        from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 
         def call_api():
             try:
@@ -117,25 +223,34 @@ class ConfigUpdater:
                     result = future.result(timeout=timeout)
                     return result
                 except FutureTimeoutError:
-                    print(f"   ⏱️  API 调用超时 ({timeout}秒)")
-                    print(
-                        f"   💡 提示: 可能是网络问题或 API 服务响应慢，建议检查网络连接"
-                    )
+                    print(f"   ⏱️  DeepSeek API 调用超时 ({timeout}秒)")
                     return None
-
         except Exception as e:
-            error_msg = str(e).lower()
-            if "timeout" in error_msg or "timed out" in error_msg:
-                print(f"   ⏱️  API 调用超时 ({timeout}秒)")
-            elif "429" in error_msg or "quota" in error_msg:
-                print(f"   ⚠️  API 配额已用尽或请求频率过高")
-            elif "403" in error_msg or "401" in error_msg:
-                print(f"   ⚠️  API 密钥无效或权限不足")
-            elif "network" in error_msg or "connection" in error_msg:
-                print(f"   ⚠️  网络连接失败，请检查网络设置")
-            else:
-                print(f"   ❌ API 调用失败: {type(e).__name__}: {str(e)[:100]}")
+            self._handle_api_error(e, "DeepSeek")
             return None
+
+    def _handle_api_error(self, e: Exception, api_name: str) -> None:
+        """处理 API 错误信息"""
+        error_msg = str(e).lower()
+        if "timeout" in error_msg or "timed out" in error_msg:
+            print(f"   ⏱️  {api_name} API 调用超时")
+        elif "429" in error_msg or "quota" in error_msg:
+            print(f"   ⚠️  {api_name} API 配额已用尽或请求频率过高")
+        elif "403" in error_msg or "401" in error_msg:
+            print(f"   ⚠️  {api_name} API 密钥无效或权限不足")
+        elif "network" in error_msg or "connection" in error_msg:
+            print(f"   ⚠️  网络连接失败，请检查网络设置")
+        else:
+            print(f"   ❌ {api_name} API 调用失败: {type(e).__name__}: {str(e)[:100]}")
+
+    def is_ai_available(self) -> bool:
+        """
+        判断是否有可用的 AI API（Gemini 或 DeepSeek）
+        
+        Returns:
+            True 如果有可用的 API
+        """
+        return self.gemini_model is not None or self.ai_client is not None
 
     def load_current_config(self) -> Dict[str, Any]:
         """
@@ -159,61 +274,104 @@ class ConfigUpdater:
             yaml.safe_dump(
                 config, f, allow_unicode=True, default_flow_style=False, sort_keys=False
             )
-        print(f"✓ 配置已保存到: {self.config_file}")
 
     def update_scenarios(
         self, all_scenes: List[str], selected_scenes: List[str]
     ) -> bool:
         """
-        根据所有场景和用户选择的场景更新配置文件的 scenarios 字段
+        增量式更新场景配置（只修改 enabled 字段，保留其他配置）
 
         Args:
-            all_scenes: 所有可用的场景列表，如 ["摔倒", "起火", "正常", "闯入"]
-            selected_scenes: 用户勾选（启用）的场景列表，如 ["摔倒", "起火"]
+            all_scenes: 所有可用的场景列表（场景名称，如 ["跌倒检测", "火灾检测"]）
+            selected_scenes: 用户勾选（启用）的场景列表
 
         Returns:
             更新是否成功
-
-        工作流程：
-        1. 加载当前配置
-        2. 为所有场景生成配置
-        3. 根据selected_scenes设置enabled字段
-        4. 更新并保存配置文件
         """
         try:
-            print(f"\n{'='*60}")
-            print(f"🔄 开始更新场景配置...")
-            print(f"{'='*60}")
-            print(f"📌 所有场景: {', '.join(all_scenes)}")
-            print(
-                f"✅ 已启用场景: {', '.join(selected_scenes) if selected_scenes else '无'}"
-            )
-            disabled = set(all_scenes) - set(selected_scenes)
-            print(f"❌ 已禁用场景: {', '.join(disabled) if disabled else '无'}")
-
             # 1. 加载当前配置
             config = self.load_current_config()
-
-            # 2. 生成新的 scenarios 配置（包含所有场景）
-            # TODO: 这里将来会调用 Gemini API 来生成规范的配置
-            new_scenarios = self._generate_scenarios_config(all_scenes, selected_scenes)
-
-            # 3. 更新配置
-            config["scenarios"] = new_scenarios
-
+            scenarios = config.get("scenarios", {})
+            
+            # 2. 增量更新：只修改 enabled 字段
+            updated_count = 0
+            for scene_key, scene_config in scenarios.items():
+                scene_name = scene_config.get("name", "")
+                should_enable = scene_name in selected_scenes
+                
+                # normal 场景特殊保护：始终保持 alert_level: low
+                if scene_key == "normal":
+                    scene_config["alert_level"] = "low"
+                
+                if scene_config.get("enabled") != should_enable:
+                    scene_config["enabled"] = should_enable
+                    updated_count += 1
+            
+            # 3. 检查是否有新场景需要添加
+            existing_names = {s.get("name") for s in scenarios.values()}
+            for scene_name in all_scenes:
+                if scene_name not in existing_names:
+                    # 新场景：尝试生成配置
+                    scene_key = self._generate_scene_key(scene_name)
+                    new_config = self._get_or_generate_scene_config(
+                        scene_name, scene_name in selected_scenes
+                    )
+                    scenarios[scene_key] = new_config
+                    updated_count += 1
+                    print(f"  ➕ 新增场景: {scene_name}")
+            
             # 4. 保存配置
+            config["scenarios"] = scenarios
             self.save_config(config)
-
-            print(f"✅ 场景配置更新成功！")
-            print(f"{'='*60}\n")
+            
+            if updated_count > 0:
+                enabled = [s.get("name") for s in scenarios.values() if s.get("enabled")]
+                print(f"✅ 场景配置已更新，启用: {', '.join(enabled)}")
+            
             return True
 
         except Exception as e:
             print(f"❌ 更新场景配置失败: {e}")
-            import traceback
-
-            traceback.print_exc()
             return False
+
+    def _get_or_generate_scene_config(
+        self, scene_name: str, enabled: bool = True
+    ) -> Dict[str, Any]:
+        """
+        获取或生成场景配置（优先使用模板，其次AI，最后默认）
+        """
+        # 预定义模板
+        templates = {
+            "跌倒检测": {"name": "跌倒检测", "prompt": "a person has fallen and is lying on the floor", "prompt_cn": "有人摔倒躺在地上", "threshold": 0.5, "cooldown": 30, "consecutive_frames": 2, "alert_level": "high"},
+            "火灾检测": {"name": "火灾检测", "prompt": "flames and fire burning with visible smoke", "prompt_cn": "发生火灾，有火焰和浓烟", "threshold": 0.5, "cooldown": 60, "consecutive_frames": 3, "alert_level": "high"},
+            "正常场景": {"name": "正常场景", "prompt": "an ordinary indoor room with no emergency", "prompt_cn": "普通室内环境，无异常", "threshold": 0.99, "cooldown": 10, "consecutive_frames": 1, "alert_level": "low"},
+            "摔倒": {"name": "跌倒检测", "prompt": "a person has fallen and is lying on the floor", "prompt_cn": "有人摔倒躺在地上", "threshold": 0.5, "cooldown": 30, "consecutive_frames": 2, "alert_level": "high"},
+            "起火": {"name": "火灾检测", "prompt": "flames and fire burning with visible smoke", "prompt_cn": "发生火灾，有火焰和浓烟", "threshold": 0.5, "cooldown": 60, "consecutive_frames": 3, "alert_level": "high"},
+            "正常": {"name": "正常场景", "prompt": "an ordinary indoor room with no emergency", "prompt_cn": "普通室内环境，无异常", "threshold": 0.99, "cooldown": 10, "consecutive_frames": 1, "alert_level": "low"},
+        }
+        
+        if scene_name in templates:
+            config = templates[scene_name].copy()
+            config["enabled"] = enabled
+            return config
+        
+        # 尝试 AI 生成
+        ai_config = self.generate_scene_with_ai(scene_name)
+        if ai_config:
+            ai_config["enabled"] = enabled
+            return ai_config
+        
+        # 默认配置
+        return {
+            "enabled": enabled,
+            "name": f"{scene_name}检测" if "检测" not in scene_name else scene_name,
+            "prompt": f"a scene of {scene_name}",
+            "prompt_cn": f"{scene_name}场景",
+            "threshold": 0.5,
+            "cooldown": 30,
+            "consecutive_frames": 2,
+            "alert_level": "medium",
+        }
 
     def _generate_scenarios_config(
         self, all_scenes: List[str], selected_scenes: List[str]
@@ -250,6 +408,16 @@ class ConfigUpdater:
                 "consecutive_frames": 2,
                 "alert_level": "high",
             },
+            "跌倒检测": {
+                "enabled": True,
+                "name": "跌倒检测",
+                "prompt": "a person has fallen and is lying on the floor",
+                "prompt_cn": "有人摔倒躺在地上",
+                "threshold": 0.4,
+                "cooldown": 30,
+                "consecutive_frames": 2,
+                "alert_level": "high",
+            },
             "起火": {
                 "enabled": True,
                 "name": "火灾检测",
@@ -260,7 +428,27 @@ class ConfigUpdater:
                 "consecutive_frames": 3,
                 "alert_level": "high",
             },
+            "火灾检测": {
+                "enabled": True,
+                "name": "火灾检测",
+                "prompt": "flames and fire burning with visible smoke",
+                "prompt_cn": "发生火灾，有火焰和浓烟",
+                "threshold": 0.4,
+                "cooldown": 60,
+                "consecutive_frames": 3,
+                "alert_level": "high",
+            },
             "正常": {
+                "enabled": False,
+                "name": "正常场景",
+                "prompt": "an ordinary indoor room with no emergency",
+                "prompt_cn": "普通室内环境，无异常",
+                "threshold": 0.99,
+                "cooldown": 10,
+                "consecutive_frames": 1,
+                "alert_level": "low",
+            },
+            "正常场景": {
                 "enabled": False,
                 "name": "正常场景",
                 "prompt": "an ordinary indoor room with no emergency",
@@ -328,22 +516,57 @@ class ConfigUpdater:
         - 正常 -> normal
         - 闯入 -> intrusion
         """
-        # 预定义映射表
+        # 预定义映射表（同时支持简写和完整名称）
         key_map = {
             "摔倒": "fall",
+            "跌倒": "fall",
+            "跌倒检测": "fall",
             "起火": "fire",
+            "火灾": "fire",
+            "火灾检测": "fire",
             "正常": "normal",
+            "正常场景": "normal",
             "闯入": "intrusion",
+            "入侵": "intrusion",
             "打架": "fight",
+            "斗殴": "fight",
             "异常行为": "abnormal_behavior",
+            "攀爬": "climbing",
+            "奔跑": "running",
+            "聚集": "gathering",
+            "徘徊": "wandering",
+            "遗留物": "abandoned_object",
+            "烟雾": "smoke",
+            "求救": "help_signal",
         }
 
         # 如果在映射表中，直接返回
         if scene_name in key_map:
             return key_map[scene_name]
 
-        # 否则尝试使用 Gemini 翻译
-        return self.generate_scene_key_with_gemini(scene_name)
+        # 否则尝试使用 AI 翻译（支持多种 LLM API）
+        return self.generate_scene_key_with_ai(scene_name)
+
+    def add_gemini_support(self, api_key: str) -> None:
+        """
+        添加 Gemini API 支持（优先使用）
+
+        Args:
+            api_key: Gemini API 密钥
+        """
+        if not GEMINI_AVAILABLE:
+            print("❌ google-generativeai 未安装，无法启用 Gemini 支持")
+            print("   安装命令: pip install google-generativeai")
+            return
+
+        self.GEMINI_API_KEY = api_key
+        try:
+            genai.configure(api_key=api_key)
+            self.gemini_model = genai.GenerativeModel('gemini-2.0-flash')
+            self.current_api = "gemini"
+            print("✓ Gemini API 初始化成功")
+        except Exception as e:
+            print(f"⚠️  Gemini API 初始化失败: {e}")
 
     def add_deepseek_support(self, api_key: str) -> None:
         """
@@ -353,7 +576,7 @@ class ConfigUpdater:
             api_key: DeepSeek API 密钥
         """
         if not DEEPSEEK_AVAILABLE:
-            print("❌ openai 未安装，无法启用 AI 支持")
+            print("❌ openai 未安装，无法启用 DeepSeek 支持")
             print("   安装命令: pip install openai")
             return
 
@@ -394,7 +617,7 @@ class ConfigUpdater:
 
     def recalculate_all_thresholds(self) -> bool:
         """
-        重新计算所有场景的阈值
+        重新计算所有场景的阈值（静默执行）
 
         当场景数量变化时调用此方法，根据新的总场景数重新计算每个场景的阈值
 
@@ -409,7 +632,6 @@ class ConfigUpdater:
                 return True
 
             total_scenarios = len(scenarios)
-            print(f"\n📊 重新计算阈值 (总场景数: {total_scenarios})")
 
             for scene_key, scene_config in scenarios.items():
                 if isinstance(scene_config, dict):
@@ -420,13 +642,14 @@ class ConfigUpdater:
                     new_threshold = self.calculate_dynamic_threshold(
                         total_scenarios, is_normal
                     )
-                    old_threshold = scene_config.get("threshold", 0.5)
                     scene_config["threshold"] = new_threshold
-                    print(f"   {scene_key}: {old_threshold} -> {new_threshold}")
+                    
+                    # 确保 normal 场景的 alert_level 始终为 low
+                    if is_normal:
+                        scene_config["alert_level"] = "low"
 
             config["scenarios"] = scenarios
             self.save_config(config)
-            print(f"✅ 阈值重新计算完成")
             return True
 
         except Exception as e:
@@ -437,7 +660,7 @@ class ConfigUpdater:
         self, scene_name: str, total_scenarios: int = 3
     ) -> Optional[Dict[str, Any]]:
         """
-        使用 DeepSeek API 为新场景生成配置
+        使用 AI API（优先 Gemini，备选 DeepSeek）为新场景生成配置
 
         Args:
             scene_name: 中文场景名称，如 "打架"、"闯入"
@@ -446,7 +669,7 @@ class ConfigUpdater:
         Returns:
             场景配置字典，失败返回 None
         """
-        if not self.ai_client:
+        if not self.is_ai_available():
             print(f"   ⚠️  AI 不可用，无法为 '{scene_name}' 生成智能配置")
             return None
 
@@ -484,8 +707,9 @@ class ConfigUpdater:
 3. 根据场景的紧急程度合理设置 cooldown、consecutive_frames 和 alert_level
 4. 只返回 JSON，不要有任何其他内容（包括注释）"""
 
+            api_name = self.current_api.upper() if self.current_api else "AI"
             print(
-                f"   📡 正在调用 DeepSeek API 为 '{scene_name}' 生成配置（超时: {self.API_TIMEOUT}秒）..."
+                f"   📡 正在调用 {api_name} API 为 '{scene_name}' 生成配置（超时: {self.API_TIMEOUT}秒）..."
             )
 
             # 使用带超时的 AI API 调用
@@ -543,7 +767,8 @@ class ConfigUpdater:
                 "alert_level": config["alert_level"],
             }
 
-            print(f"   ✅ DeepSeek 成功生成配置:")
+            api_name = self.current_api.upper() if self.current_api else "AI"
+            print(f"   ✅ {api_name} 成功生成配置:")
             print(f"      - name: {ordered_config['name']}")
             print(f"      - prompt: {ordered_config['prompt'][:60]}...")
             print(f"      - threshold: {ordered_config['threshold']} (动态计算)")
@@ -568,7 +793,7 @@ class ConfigUpdater:
         Returns:
             英文键（小写+下划线）
         """
-        if not self.ai_client:
+        if not self.is_ai_available():
             return self._generate_pinyin_key(scene_name)
 
         try:
@@ -609,18 +834,21 @@ class ConfigUpdater:
         Returns:
             转换后的键名（小写+下划线）
         """
-        # 预定义映射表
+        # 预定义映射表（同时支持简写和完整名称）
         key_map = {
             "摔倒": "fall",
-            "起火": "fire",
-            "正常": "normal",
-            "闯入": "intrusion",
-            "打架": "fight",
-            "异常行为": "abnormal_behavior",
             "跌倒": "fall",
+            "跌倒检测": "fall",
+            "起火": "fire",
             "火灾": "fire",
+            "火灾检测": "fire",
+            "正常": "normal",
+            "正常场景": "normal",
+            "闯入": "intrusion",
             "入侵": "intrusion",
+            "打架": "fight",
             "斗殴": "fight",
+            "异常行为": "abnormal_behavior",
             "攀爬": "climbing",
             "奔跑": "running",
             "聚集": "gathering",
@@ -686,10 +914,6 @@ class ConfigUpdater:
             是否成功添加
         """
         try:
-            print(f"\n{'='*60}")
-            print(f"➕ 添加新场景: {scene_key}")
-            print(f"{'='*60}")
-
             # 1. 加载当前配置
             config = self.load_current_config()
 
@@ -697,36 +921,25 @@ class ConfigUpdater:
             if "scenarios" not in config:
                 config["scenarios"] = {}
 
-            # 3. 检查是否已存在
-            if scene_key in config["scenarios"]:
-                print(f"   ⚠️  场景 '{scene_key}' 已存在，将覆盖")
-
-            # 4. 添加场景配置
+            # 3. 添加场景配置
             config["scenarios"][scene_key] = scene_config
 
-            # 5. 保存配置
+            # 4. 保存配置
             self.save_config(config)
 
-            # 6. 重新计算所有场景的阈值（因为场景数量变化了）
+            # 5. 重新计算所有场景的阈值
             self.recalculate_all_thresholds()
 
-            print(f"✅ 新场景 '{scene_key}' 添加成功！")
-            print(f"   - name: {scene_config.get('name', 'N/A')}")
-            print(f"   - prompt: {scene_config.get('prompt', 'N/A')[:50]}...")
-            print(f"   - enabled: {scene_config.get('enabled', True)}")
-            print(f"{'='*60}\n")
+            print(f"✅ 新增场景: {scene_config.get('name', scene_key)}")
             return True
 
         except Exception as e:
             print(f"❌ 添加场景失败: {e}")
-            import traceback
-
-            traceback.print_exc()
             return False
 
     def delete_scenarios_by_names(self, scene_names: List[str]) -> bool:
         """
-        根据中文名称删除场景
+        根据中文名称删除场景（内置场景不可删除）
 
         Args:
             scene_names: 要删除的场景名称列表（中文，如 ["打架", "闯入"]）
@@ -734,24 +947,34 @@ class ConfigUpdater:
         Returns:
             是否成功删除
         """
+        # 过滤掉受保护的场景（使用模块级常量）
+        deletable_scenes = [s for s in scene_names if s not in PROTECTED_SCENE_NAMES]
+        if len(deletable_scenes) < len(scene_names):
+            skipped = set(scene_names) - set(deletable_scenes)
+            print(f"⚠️  跳过内置场景: {', '.join(skipped)}")
+        
+        if not deletable_scenes:
+            print("⚠️  没有可删除的场景")
+            return False
+        
         try:
-            print(f"\n{'='*60}")
-            print(f"🗑️  删除场景: {', '.join(scene_names)}")
-            print(f"{'='*60}")
-
             # 1. 加载当前配置
             config = self.load_current_config()
             scenarios = config.get("scenarios", {})
 
             if not scenarios:
-                print("   ⚠️  配置文件中没有场景")
+                print("⚠️  配置文件中没有场景")
                 return False
 
-            # 2. 找到对应的场景键
+            # 2. 找到对应的场景键（跳过受保护的键）
             keys_to_delete = []
-            for scene_name in scene_names:
+            for scene_name in deletable_scenes:
                 found = False
                 for key, value in scenarios.items():
+                    # 跳过受保护的键（使用模块级常量）
+                    if key in PROTECTED_SCENE_KEYS:
+                        continue
+                        
                     if isinstance(value, dict):
                         config_name = value.get("name", "")
 
@@ -779,38 +1002,33 @@ class ConfigUpdater:
                             break
 
                 if not found:
-                    print(f"   ⚠️  未找到场景: {scene_name}")
+                    print(f"⚠️  未找到场景: {scene_name}")
 
             if not keys_to_delete:
-                print(f"   ⚠️  未找到任何要删除的场景")
+                print(f"⚠️  未找到任何要删除的场景")
                 return False
 
             # 3. 删除场景
-            deleted_count = 0
+            deleted_names = []
             for key in keys_to_delete:
                 if key in scenarios:
                     scene_name = scenarios[key].get("name", key)
                     del scenarios[key]
-                    deleted_count += 1
-                    print(f"   ✓ 已删除: {scene_name} (key: {key})")
+                    deleted_names.append(scene_name)
 
             # 4. 保存配置
             config["scenarios"] = scenarios
             self.save_config(config)
 
             # 5. 重新计算所有场景的阈值（因为场景数量变化了）
-            if deleted_count > 0:
+            if deleted_names:
                 self.recalculate_all_thresholds()
+                print(f"🗑️  已删除: {', '.join(deleted_names)}")
 
-            print(f"✅ 成功删除 {deleted_count} 个场景！")
-            print(f"{'='*60}\n")
             return True
 
         except Exception as e:
             print(f"❌ 删除场景失败: {e}")
-            import traceback
-
-            traceback.print_exc()
             return False
 
     def get_all_scene_names(self) -> List[str]:
