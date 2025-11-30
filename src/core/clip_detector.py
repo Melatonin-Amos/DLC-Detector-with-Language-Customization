@@ -199,12 +199,23 @@ class CLIPDetector:
         # 使用VLM计算所有提示词的相似度
         logits, probs = self.clip_model.predict(image, all_prompts, temperature=self.temperature)
         
-        # 确保probs在CPU上
-        if hasattr(probs, 'cpu'):
-            probs = probs.cpu()
+        # 统一转换为列表（兼容张量和列表返回值）
+        if hasattr(logits, 'cpu'):
+            logits_list = logits.cpu().tolist()
+        elif hasattr(logits, 'tolist'):
+            logits_list = logits.tolist()
+        else:
+            logits_list = list(logits)
         
-        logger.debug(f"VLM原始分数: {[f'{l:.4f}' for l in logits.tolist()]}")
-        logger.debug(f"Softmax概率: {[f'{p:.4f}' for p in probs.tolist()]}")
+        if hasattr(probs, 'cpu'):
+            probs_list = probs.cpu().tolist()
+        elif hasattr(probs, 'tolist'):
+            probs_list = probs.tolist()
+        else:
+            probs_list = list(probs)
+        
+        logger.debug(f"VLM原始分数: {[f'{l:.4f}' for l in logits_list]}")
+        logger.debug(f"Softmax概率: {[f'{p:.4f}' for p in probs_list]}")
         
         # 检测每个场景（保持索引与prompt_scenario_pairs一致）
         all_results = {}
@@ -221,8 +232,8 @@ class CLIPDetector:
                 logger.debug(f"场景 '{scenario.name}' 冷却中，跳过")
                 continue
             
-            # 获取该场景的置信度
-            confidence = probs[idx].item() if hasattr(probs[idx], 'item') else float(probs[idx])
+            # 获取该场景的置信度（使用列表）
+            confidence = float(probs_list[idx])
             all_results[scenario_id] = confidence
             
             logger.info(f"场景 '{scenario.name}': {confidence:.4f} (阈值: {scenario.threshold})")

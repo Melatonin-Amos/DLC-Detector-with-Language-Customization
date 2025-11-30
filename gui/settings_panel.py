@@ -12,8 +12,18 @@
 
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
-from typing import Dict, Optional, Union
+from typing import Dict, Optional, Union, Callable
 from ttkthemes import ThemedStyle
+import threading
+import sys
+import os
+
+# 添加项目根目录到路径
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from src.utils.config_updater import ConfigUpdater
+import yaml
+import yaml
+import yaml
 
 
 class SettingsPanel:
@@ -85,8 +95,14 @@ class SettingsPanel:
                     "resolution": "1280x720",
                 }
 
-        # 场景类型列表（引用配置中的数据）
-        self.scene_types: list[str] = self.app_config.get("scene_types", ["摔倒", "起火"])
+        # 场景类型列表：优先从 YAML 加载，否则使用配置或默认值
+        self.scene_types: list[
+            str
+        ] = self._load_scene_types_from_yaml() or self.app_config.get(
+            "scene_types", ["摔倒", "起火"]
+        )
+        # 同步到 app_config
+        self.app_config["scene_types"] = self.scene_types
 
         # 场景复选框变量字典 {场景名: BooleanVar}
         self.scene_checkbox_vars: Dict[str, tk.BooleanVar] = {}
@@ -119,6 +135,46 @@ class SettingsPanel:
 
         # 绑定窗口缩放事件
         self.parent.bind("<Configure>", self._on_window_resize)
+
+    def _load_scene_types_from_yaml(self) -> Optional[list[str]]:
+        """从 YAML 配置文件加载场景类型列表
+
+        Returns:
+            场景类型列表，如果加载失败返回 None
+        """
+        try:
+            config_path = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                "config",
+                "detection",
+                "default.yaml",
+            )
+
+            if not os.path.exists(config_path):
+                return None
+
+            with open(config_path, "r", encoding="utf-8") as f:
+                config = yaml.safe_load(f)
+
+            if not config or "scenarios" not in config:
+                return None
+
+            # 从 scenarios 中提取场景名称
+            scenarios = config["scenarios"]
+            scene_types = [
+                scenario.get("name")
+                for scenario in scenarios.values()
+                if scenario.get("name")
+            ]
+
+            if scene_types:
+                print(f"✅ 从 YAML 加载了 {len(scene_types)} 个场景: {scene_types}")
+                return scene_types
+
+        except Exception as e:
+            print(f"⚠️  从 YAML 加载场景失败: {e}")
+
+        return None
 
     def _setup_fonts(self) -> None:
         """配置字体和样式"""
@@ -241,9 +297,7 @@ class SettingsPanel:
 
     def _create_video_page(self) -> ttk.Frame:
         """创建视频配置页面"""
-        frame = ttk.LabelFrame(
-            self.content_container, text="🎬 视频配置", padding=20
-        )
+        frame = ttk.LabelFrame(self.content_container, text="🎬 视频配置", padding=20)
 
         # 说明文字
         desc_label = ttk.Label(
@@ -263,32 +317,54 @@ class SettingsPanel:
         path_frame.pack(fill=tk.X, pady=(0, 12))
 
         ttk.Label(path_frame, text="默认路径:", width=12, anchor="w").pack(side=tk.LEFT)
-        self.video_path_var = tk.StringVar(value=self.app_config.get("video", {}).get("default_path", ""))
-        ttk.Entry(path_frame, textvariable=self.video_path_var, width=40).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(10, 10))
-        ttk.Button(path_frame, text="浏览...", command=self._browse_video, width=10, style="Action.TButton").pack(side=tk.LEFT)
+        self.video_path_var = tk.StringVar(
+            value=self.app_config.get("video", {}).get("default_path", "")
+        )
+        ttk.Entry(path_frame, textvariable=self.video_path_var, width=40).pack(
+            side=tk.LEFT, fill=tk.X, expand=True, padx=(10, 10)
+        )
+        ttk.Button(
+            path_frame,
+            text="浏览...",
+            command=self._browse_video,
+            width=10,
+            style="Action.TButton",
+        ).pack(side=tk.LEFT)
 
         # 播放选项
         options_frame = ttk.Frame(video_section)
         options_frame.pack(fill=tk.X, pady=(0, 12))
 
-        self.auto_play_var = tk.BooleanVar(value=self.app_config.get("video", {}).get("auto_play", True))
-        ttk.Checkbutton(options_frame, text="加载后自动播放", variable=self.auto_play_var).pack(side=tk.LEFT, padx=(0, 30))
+        self.auto_play_var = tk.BooleanVar(
+            value=self.app_config.get("video", {}).get("auto_play", True)
+        )
+        ttk.Checkbutton(
+            options_frame, text="加载后自动播放", variable=self.auto_play_var
+        ).pack(side=tk.LEFT, padx=(0, 30))
 
-        self.loop_play_var = tk.BooleanVar(value=self.app_config.get("video", {}).get("loop_play", False))
-        ttk.Checkbutton(options_frame, text="循环播放", variable=self.loop_play_var).pack(side=tk.LEFT)
+        self.loop_play_var = tk.BooleanVar(
+            value=self.app_config.get("video", {}).get("loop_play", False)
+        )
+        ttk.Checkbutton(
+            options_frame, text="循环播放", variable=self.loop_play_var
+        ).pack(side=tk.LEFT)
 
         # 默认倍速
         speed_frame = ttk.Frame(video_section)
         speed_frame.pack(fill=tk.X, pady=(0, 8))
 
-        ttk.Label(speed_frame, text="默认倍速:", width=12, anchor="w").pack(side=tk.LEFT)
-        self.default_speed_var = tk.StringVar(value=self.app_config.get("video", {}).get("default_speed", "1.0"))
+        ttk.Label(speed_frame, text="默认倍速:", width=12, anchor="w").pack(
+            side=tk.LEFT
+        )
+        self.default_speed_var = tk.StringVar(
+            value=self.app_config.get("video", {}).get("default_speed", "1.0")
+        )
         speed_combo = ttk.Combobox(
             speed_frame,
             textvariable=self.default_speed_var,
             values=["0.25", "0.5", "1.0", "1.5", "2.0", "3.0"],
             state="readonly",
-            width=12
+            width=12,
         )
         speed_combo.pack(side=tk.LEFT, padx=(10, 0))
 
@@ -300,28 +376,36 @@ class SettingsPanel:
         camera_frame = ttk.Frame(camera_section)
         camera_frame.pack(fill=tk.X, pady=(0, 12))
 
-        ttk.Label(camera_frame, text="摄像头索引:", width=12, anchor="w").pack(side=tk.LEFT)
-        self.camera_index_var = tk.StringVar(value=self.app_config.get("camera", {}).get("camera_index", "0"))
+        ttk.Label(camera_frame, text="摄像头索引:", width=12, anchor="w").pack(
+            side=tk.LEFT
+        )
+        self.camera_index_var = tk.StringVar(
+            value=self.app_config.get("camera", {}).get("camera_index", "0")
+        )
         ttk.Combobox(
             camera_frame,
             textvariable=self.camera_index_var,
             values=["0", "1", "2", "3"],
             state="readonly",
-            width=12
+            width=12,
         ).pack(side=tk.LEFT, padx=(10, 0))
 
         # 分辨率
         resolution_frame = ttk.Frame(camera_section)
         resolution_frame.pack(fill=tk.X, pady=(0, 8))
 
-        ttk.Label(resolution_frame, text="分辨率:", width=12, anchor="w").pack(side=tk.LEFT)
-        self.resolution_var = tk.StringVar(value=self.app_config.get("camera", {}).get("resolution", "1280x720"))
+        ttk.Label(resolution_frame, text="分辨率:", width=12, anchor="w").pack(
+            side=tk.LEFT
+        )
+        self.resolution_var = tk.StringVar(
+            value=self.app_config.get("camera", {}).get("resolution", "1280x720")
+        )
         ttk.Combobox(
             resolution_frame,
             textvariable=self.resolution_var,
             values=["640x480", "1280x720", "1920x1080"],
             state="readonly",
-            width=15
+            width=15,
         ).pack(side=tk.LEFT, padx=(10, 0))
 
         # 按钮区域 - 增加间距
@@ -332,14 +416,14 @@ class SettingsPanel:
             button_frame,
             text="测试摄像头",
             command=self._test_camera,
-            style="Action.TButton"
+            style="Action.TButton",
         ).pack(side=tk.LEFT, padx=(0, 15))
 
         ttk.Button(
             button_frame,
             text="保存配置",
             command=self._save_video_config,
-            style="Action.TButton"
+            style="Action.TButton",
         ).pack(side=tk.LEFT)
 
         return frame
@@ -350,8 +434,8 @@ class SettingsPanel:
             title="选择视频文件",
             filetypes=[
                 ("视频文件", "*.mp4 *.avi *.mkv *.mov *.wmv *.flv"),
-                ("所有文件", "*.*")
-            ]
+                ("所有文件", "*.*"),
+            ],
         )
         if file_path:
             self.video_path_var.set(file_path)
@@ -359,7 +443,9 @@ class SettingsPanel:
     def _test_camera(self) -> None:
         """测试摄像头连接"""
         camera_index = int(self.camera_index_var.get())
-        messagebox.showinfo("测试摄像头", f"正在测试摄像头 {camera_index}...\n(此功能待实现)")
+        messagebox.showinfo(
+            "测试摄像头", f"正在测试摄像头 {camera_index}...\n(此功能待实现)"
+        )
 
     def _save_video_config(self) -> None:
         """保存视频配置"""
@@ -377,7 +463,9 @@ class SettingsPanel:
         self.app_config["camera"]["resolution"] = self.resolution_var.get()
 
         messagebox.showinfo("保存成功", "视频配置已保存")
-        print(f"视频配置已保存: {self.app_config['video']}, {self.app_config['camera']}")
+        print(
+            f"视频配置已保存: {self.app_config['video']}, {self.app_config['camera']}"
+        )
 
     def _create_scene_page(self) -> ttk.Frame:
         """创建场景配置页面"""
@@ -447,7 +535,9 @@ class SettingsPanel:
         light_frame = ttk.Frame(params_frame)
         light_frame.pack(fill=tk.X, pady=(0, 15))
 
-        ttk.Label(light_frame, text="光照条件:", width=12, anchor="w").pack(side=tk.LEFT)
+        ttk.Label(light_frame, text="光照条件:", width=12, anchor="w").pack(
+            side=tk.LEFT
+        )
         self.light_condition_var = tk.StringVar(
             value=self.app_config.get("scene", {}).get("light_condition", "normal")
         )
@@ -480,7 +570,9 @@ class SettingsPanel:
         alarm_frame = ttk.Frame(params_frame)
         alarm_frame.pack(fill=tk.X, pady=(0, 15))
 
-        ttk.Label(alarm_frame, text="报警设置:", width=12, anchor="w").pack(side=tk.LEFT)
+        ttk.Label(alarm_frame, text="报警设置:", width=12, anchor="w").pack(
+            side=tk.LEFT
+        )
         self.enable_sound_var = tk.BooleanVar(
             value=self.app_config.get("scene", {}).get("enable_sound", True)
         )
@@ -499,7 +591,9 @@ class SettingsPanel:
         record_frame = ttk.Frame(params_frame)
         record_frame.pack(fill=tk.X, pady=(0, 10))
 
-        ttk.Label(record_frame, text="录像设置:", width=12, anchor="w").pack(side=tk.LEFT)
+        ttk.Label(record_frame, text="录像设置:", width=12, anchor="w").pack(
+            side=tk.LEFT
+        )
         self.auto_record_var = tk.BooleanVar(
             value=self.app_config.get("scene", {}).get("auto_record", False)
         )
@@ -515,14 +609,14 @@ class SettingsPanel:
             scene_button_frame,
             text="设置ROI区域",
             command=self._set_roi_area,
-            style="Action.TButton"
+            style="Action.TButton",
         ).pack(side=tk.LEFT, padx=(0, 15))
 
         ttk.Button(
             scene_button_frame,
             text="保存场景配置",
             command=self._save_scene_config,
-            style="Action.TButton"
+            style="Action.TButton",
         ).pack(side=tk.LEFT)
 
         return frame
@@ -607,7 +701,7 @@ class SettingsPanel:
         # TODO: 根据场景类型加载预设参数
 
     def _create_new_scene(self) -> None:
-        """创建新场景"""
+        """创建新场景 - 使用Gemini AI生成配置"""
         # 创建对话框窗口
         dialog = tk.Toplevel(self.parent)
         dialog.title("新建场景")
@@ -647,8 +741,46 @@ class SettingsPanel:
             foreground="gray",
         ).pack(pady=(0, 35))
 
+        # 状态标签（用于显示生成中状态）
+        status_label = ttk.Label(
+            input_frame,
+            text="",
+            font=self.fonts["small"],
+            foreground="blue",
+        )
+        status_label.pack(pady=(0, 15))
+
+        # 按钮框架（居中）
+        button_frame = ttk.Frame(input_frame)
+        button_frame.pack(pady=(15, 0))
+
+        confirm_btn = ttk.Button(
+            button_frame, text="✓ 确定", width=12, style="Action.TButton"
+        )
+        confirm_btn.pack(side=tk.LEFT, padx=15)
+
+        cancel_btn = ttk.Button(
+            button_frame, text="✕ 取消", width=12, style="Action.TButton"
+        )
+        cancel_btn.pack(side=tk.LEFT, padx=15)
+
+        def on_timeout():
+            """超时时的回调"""
+            dialog.destroy()  # 关闭新建场景窗口
+            messagebox.showwarning(
+                "AI 生成超时",
+                "DeepSeek AI 服务响应超时，可能原因：\n\n"
+                "• 网络连接较慢或不稳定\n"
+                "• API 服务响应延迟\n\n"
+                "建议：\n"
+                "1. 检查网络连接\n"
+                "2. 稍后重试\n"
+                "3. 系统已为您创建默认配置",
+                parent=self.parent,
+            )
+
         def on_confirm():
-            """确认创建"""
+            """确认创建 - 使用DeepSeek AI生成配置"""
             scene_name = scene_name_var.get().strip()
 
             if not scene_name:
@@ -663,40 +795,125 @@ class SettingsPanel:
                 )
                 return
 
-            # 添加到场景列表
-            self.scene_types.append(scene_name)
+            # 禁用按钮，显示加载状态
+            confirm_btn.config(state=tk.DISABLED)
+            cancel_btn.config(state=tk.DISABLED)
+            name_entry.config(state=tk.DISABLED)
+            status_label.config(text="🤖 AI正在生成场景配置，请稍候...")
+            dialog.update()
 
-            # 重新创建复选框列表
-            self._create_scene_checkboxes()
+            def generate_scene_config():
+                """在后台线程中生成场景配置"""
+                import time
 
-            messagebox.showinfo(
-                "创建成功", f"场景 '{scene_name}' 已成功创建", parent=dialog
-            )
-            dialog.destroy()
+                timeout_seconds = 35  # 稍长于 ConfigUpdater 的超时时间
+                start_time = time.time()
+
+                try:
+                    # 获取配置文件路径
+                    config_path = os.path.join(
+                        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        "config",
+                        "detection",
+                        "default.yaml",
+                    )
+
+                    # 创建ConfigUpdater并使用Gemini生成配置
+                    config_updater = ConfigUpdater(config_path)
+
+                    # 获取当前场景数量（用于计算阈值）
+                    current_config = config_updater.load_current_config()
+                    current_scenario_count = len(current_config.get("scenarios", {}))
+
+                    # 使用 DeepSeek AI 生成场景配置（传入当前场景数）
+                    scene_config = config_updater.generate_scene_with_ai(
+                        scene_name, total_scenarios=current_scenario_count
+                    )
+
+                    # 检查是否超时
+                    elapsed = time.time() - start_time
+                    if scene_config is None and elapsed > timeout_seconds * 0.8:
+                        # 超时情况：显示提示框并关闭窗口
+                        dialog.after(0, lambda: on_timeout())
+                        return
+
+                    if scene_config is None:
+                        # AI 失败但非超时，使用默认配置
+                        scene_config = config_updater._generate_default_scene_config(
+                            scene_name, total_scenarios=current_scenario_count
+                        )
+
+                    # 生成场景key
+                    scene_key = config_updater.generate_scene_key_with_ai(scene_name)
+                    if scene_key is None:
+                        # 使用拼音作为备选
+                        scene_key = config_updater._generate_pinyin_key(scene_name)
+
+                    # 确保enabled为True（新创建的场景默认启用）
+                    scene_config["enabled"] = True
+
+                    # 直接添加到配置文件（会自动重新计算所有阈值）
+                    success = config_updater.add_new_scenario(scene_key, scene_config)
+
+                    # 回到主线程更新UI
+                    dialog.after(
+                        0,
+                        lambda: on_generation_complete(success, scene_name, scene_key),
+                    )
+
+                except Exception as e:
+                    print(f"生成场景配置时出错: {e}")
+                    dialog.after(0, lambda: on_generation_error(str(e)))
+
+            def on_generation_complete(success: bool, scene_name: str, scene_key: str):
+                """生成完成后的回调"""
+                if success:
+                    # 添加到场景列表
+                    self.scene_types.append(scene_name)
+
+                    # 重新创建复选框列表（这会创建新的 scene_checkbox_vars）
+                    self._create_scene_checkboxes()
+
+                    # 自动勾选新创建的场景
+                    if (
+                        hasattr(self, "scene_checkbox_vars")
+                        and scene_name in self.scene_checkbox_vars
+                    ):
+                        self.scene_checkbox_vars[scene_name].set(True)
+
+                    # 通知场景变化（触发配置更新）
+                    self._on_scene_checkbox_change()
+
+                    messagebox.showinfo(
+                        "创建成功",
+                        f"场景 '{scene_name}' 已成功创建\n配置已自动生成并保存",
+                        parent=dialog,
+                    )
+                    dialog.destroy()
+                else:
+                    status_label.config(text="❌ 配置保存失败", foreground="red")
+                    confirm_btn.config(state=tk.NORMAL)
+                    cancel_btn.config(state=tk.NORMAL)
+                    name_entry.config(state=tk.NORMAL)
+
+            def on_generation_error(error_msg: str):
+                """生成出错时的回调"""
+                status_label.config(text=f"❌ 生成失败: {error_msg}", foreground="red")
+                confirm_btn.config(state=tk.NORMAL)
+                cancel_btn.config(state=tk.NORMAL)
+                name_entry.config(state=tk.NORMAL)
+
+            # 在后台线程中执行生成
+            thread = threading.Thread(target=generate_scene_config, daemon=True)
+            thread.start()
 
         def on_cancel():
             """取消创建"""
             dialog.destroy()
 
-        # 按钮框架（居中）
-        button_frame = ttk.Frame(input_frame)
-        button_frame.pack(pady=(15, 0))
-
-        ttk.Button(
-            button_frame,
-            text="✓ 确定",
-            command=on_confirm,
-            width=12,
-            style="Action.TButton"
-        ).pack(side=tk.LEFT, padx=15)
-
-        ttk.Button(
-            button_frame,
-            text="✕ 取消",
-            command=on_cancel,
-            width=12,
-            style="Action.TButton"
-        ).pack(side=tk.LEFT, padx=15)
+        # 绑定按钮命令
+        confirm_btn.config(command=on_confirm)
+        cancel_btn.config(command=on_cancel)
 
         # 绑定回车键
         name_entry.bind("<Return>", lambda e: on_confirm())
@@ -730,10 +947,42 @@ class SettingsPanel:
         # 确认删除
         scene_list = "\n".join(f"• {s}" for s in selected_scenes)
         result = messagebox.askyesno(
-            "确认删除", f"确定要删除以下场景吗？\n\n{scene_list}\n\n此操作无法撤销。"
+            "确认删除",
+            f"确定要删除以下场景吗？\n\n{scene_list}\n\n此操作将同时删除配置文件中的场景配置，无法撤销。",
         )
 
         if result:
+            # 从配置文件中删除场景
+            try:
+                config_path = os.path.join(
+                    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                    "config",
+                    "detection",
+                    "default.yaml",
+                )
+                config_updater = ConfigUpdater(config_path)
+
+                # 调用配置更新器删除场景
+                success = config_updater.delete_scenarios_by_names(selected_scenes)
+
+                if not success:
+                    messagebox.showerror(
+                        "删除失败",
+                        "配置文件删除失败，请查看控制台输出",
+                    )
+                    return
+
+            except Exception as e:
+                messagebox.showerror(
+                    "删除失败",
+                    f"删除配置文件时出错：\n{str(e)}",
+                )
+                print(f"删除场景配置失败: {e}")
+                import traceback
+
+                traceback.print_exc()
+                return
+
             # 从列表中移除选中的场景
             for scene in selected_scenes:
                 if scene in self.scene_types:
@@ -748,7 +997,10 @@ class SettingsPanel:
             # 重新创建复选框
             self._create_scene_checkboxes()
 
-            messagebox.showinfo("删除成功", f"已成功删除 {len(selected_scenes)} 个场景")
+            messagebox.showinfo(
+                "删除成功",
+                f"已成功删除 {len(selected_scenes)} 个场景\n配置文件已同步更新",
+            )
 
     def _toggle_roi(self) -> None:
         """切换ROI启用状态"""
