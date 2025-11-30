@@ -467,3 +467,91 @@ class CLIPDetector:
             'model_info': self.clip_model.get_model_info()
         }
 
+    def reload_scenarios(self, config_path: str = None) -> bool:
+        """
+        热重载场景配置（从 YAML 文件重新加载场景）
+        
+        当用户通过 GUI 新增或修改场景后调用此方法，
+        检测器将重新加载配置文件中的场景定义和阈值。
+        
+        Args:
+            config_path: 配置文件路径，默认使用 config/detection/default.yaml
+        
+        Returns:
+            是否成功重载
+        """
+        import yaml
+        from pathlib import Path
+        
+        try:
+            # 确定配置文件路径
+            if config_path is None:
+                # 默认路径：项目根目录/config/detection/default.yaml
+                project_root = Path(__file__).parent.parent.parent
+                config_path = project_root / "config" / "detection" / "default.yaml"
+            else:
+                config_path = Path(config_path)
+            
+            if not config_path.exists():
+                logger.error(f"配置文件不存在: {config_path}")
+                return False
+            
+            # 读取 YAML 配置
+            with open(config_path, 'r', encoding='utf-8') as f:
+                detection_config = yaml.safe_load(f)
+            
+            if not detection_config or 'scenarios' not in detection_config:
+                logger.warning("配置文件中没有场景定义")
+                return False
+            
+            # 保存旧的场景列表用于对比
+            old_scenarios = set(self.scenarios.keys())
+            
+            # 重新加载场景配置
+            new_scenarios = {}
+            scenarios_config = detection_config.get('scenarios', {})
+            
+            for scenario_id, scenario_dict in scenarios_config.items():
+                # 保留已有场景的运行时状态（历史记录、连续计数等）
+                if scenario_id in self.scenarios:
+                    old_scenario = self.scenarios[scenario_id]
+                    new_scenario = ScenarioConfig(scenario_dict, self.translator)
+                    # 保留运行时状态
+                    new_scenario.last_trigger_time = old_scenario.last_trigger_time
+                    new_scenario.consecutive_count = old_scenario.consecutive_count
+                    new_scenario.history = old_scenario.history
+                    new_scenarios[scenario_id] = new_scenario
+                else:
+                    # 新场景
+                    new_scenarios[scenario_id] = ScenarioConfig(scenario_dict, self.translator)
+                
+                # 打印加载信息
+                scenario_name = scenario_dict.get('name', scenario_id)
+                threshold = scenario_dict.get('threshold', 0.5)
+                enabled = scenario_dict.get('enabled', True)
+                status = "启用" if enabled else "禁用"
+                logger.info(f"✓ 加载场景: {scenario_name} (阈值: {threshold:.3f}, {status})")
+            
+            # 更新场景列表
+            self.scenarios = new_scenarios
+            
+            # 更新全局配置
+            self.enabled = detection_config.get('enabled', True)
+            
+            # 统计变化
+            new_scenario_set = set(new_scenarios.keys())
+            added = new_scenario_set - old_scenarios
+            removed = old_scenarios - new_scenario_set
+            
+            if added:
+                logger.info(f"➕ 新增场景: {', '.join(added)}")
+            if removed:
+                logger.info(f"➖ 移除场景: {', '.join(removed)}")
+            
+            logger.info(f"✅ 场景配置已重载，共 {len(self.scenarios)} 个场景")
+            return True
+            
+        except Exception as e:
+            logger.error(f"重载场景配置失败: {e}")
+            return False
+

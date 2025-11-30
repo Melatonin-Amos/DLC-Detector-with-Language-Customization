@@ -780,6 +780,9 @@ class MainWindow:
             print(f"⚠️  设置窗口图标加载失败: {e}")
 
         self.settings_panel = SettingsPanel(self.settings_window, self.app_config)
+        
+        # 注册场景变化回调（用于检测器热重载）
+        self.settings_panel.set_scenarios_changed_callback(self._reload_detector_scenarios)
 
         # 启动场景变化监听器
         if self.config_updater:
@@ -787,9 +790,8 @@ class MainWindow:
                 callback=self._on_scene_config_change,
                 interval=500,  # 每500ms检查一次
                 print_changes=True,  # 打印变化信息
-                print_full_config=False,  # 不打印完整配置（避免刷屏）
+                print_full_config=False,  # 不打印完整配置
             )
-            print("✓ 场景变化监听器已启动")
 
         def on_settings_close():
             # 停止监听器
@@ -872,6 +874,7 @@ class MainWindow:
                                     print(
                                         f"⚠️  检测到: {result['scenario_name']} (置信度: {result['confidence']:.2%})"
                                     )
+                                    # 1. 触发警报管理器（保存帧、日志等）
                                     if (
                                         hasattr(self, "alert_manager")
                                         and self.alert_manager
@@ -879,6 +882,8 @@ class MainWindow:
                                         self.alert_manager.trigger_alert(
                                             result, frame_rgb
                                         )
+                                    # 2. 更新 GUI 警报显示面板
+                                    self.trigger_alert_with_result(result)
                             except Exception as e:
                                 print(f"检测错误: {e}")
 
@@ -1105,47 +1110,53 @@ class MainWindow:
 
     def _on_scene_config_change(self, old_config: Dict, new_config: Dict) -> None:
         """
-        场景配置变化时的回调函数
+        场景配置变化时的回调函数（增量更新配置文件 + 热重载检测器）
 
         Args:
             old_config: 旧配置
             new_config: 新配置
-
-        功能：
-        1. 检测 selected_scenes 是否发生变化
-        2. 如果变化，调用 ConfigUpdater 更新配置文件
-        3. 配置文件会包含所有场景，通过enabled字段控制是否检测
-        4. 未来：触发检测器重新加载配置
         """
         # 检查选中场景是否变化
         old_scenes = set(old_config.get("selected_scenes", []))
         new_scenes = set(new_config.get("selected_scenes", []))
 
         if old_scenes != new_scenes:
-            print(f"\n{'🔔'*30}")
-            print(f"检测到场景选择变化！")
-            print(f"旧启用场景: {sorted(old_scenes) if old_scenes else '无'}")
-            print(f"新启用场景: {sorted(new_scenes) if new_scenes else '无'}")
-            print(f"{'🔔'*30}\n")
-
-            # 获取所有可用场景（从settings_panel获取）
+            # 获取所有可用场景
             if self.settings_panel:
                 all_scenes = self.settings_panel.get_all_scene_types()
 
-                # 更新配置文件（包含所有场景，通过enabled控制启用状态）
-                if self.config_updater:
-                    success = self.config_updater.update_scenarios(
+                # 优先使用 settings_panel 中复用的 config_updater
+                config_updater = self.settings_panel.get_config_updater()
+                if config_updater is None:
+                    config_updater = self.config_updater
+                
+                # 增量更新配置文件（只修改 enabled 字段）
+                if config_updater:
+                    config_updater.update_scenarios(
                         all_scenes=all_scenes, selected_scenes=sorted(new_scenes)
                     )
+                
+                # 通知检测器重新加载场景配置（热重载）
+                self._reload_detector_scenarios()
 
+    def _reload_detector_scenarios(self) -> None:
+        """
+        通知检测器热重载场景配置
+        
+        当用户通过 GUI 修改场景配置后，检测器需要重新加载
+        以反映最新的场景定义和阈值设置
+        """
+        if hasattr(self, 'detector') and self.detector is not None:
+            try:
+                # 调用检测器的热重载方法
+                if hasattr(self.detector, 'reload_scenarios'):
+                    success = self.detector.reload_scenarios()
                     if success:
-                        print("✅ 配置文件已自动更新")
-                        print("   📝 配置文件包含所有场景，通过enabled字段控制是否检测")
-                        # TODO: 未来可以在这里触发检测器重新加载配置
-                        # if self.detector:
-                        #     self.detector.reload_config()
+                        print("✅ 检测器场景配置已热重载")
                     else:
-                        print("❌ 配置文件更新失败")
+                        print("⚠️  检测器场景配置热重载失败")
+            except Exception as e:
+                print(f"⚠️  热重载检测器失败: {e}")
 
     # ==================== 自动启动方法（终端命令模式） ====================
 
