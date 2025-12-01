@@ -23,7 +23,7 @@ save_frame:
 # 邮件警报（仅对 alert_level: high 的场景触发）
 email:
   enabled: false  # 是否启用邮件警报
-  smtp_server: "smtp.163.com"  # SMTP服务器地址（QQ: smtp.qq.com, 163: smtp.163.com, Gmail: smtp.gmail.com）
+  smtp_server: "smtp.qq.com"  # SMTP服务器地址（QQ: smtp.qq.com, 163: smtp.163.com, Gmail: smtp.gmail.com）
   smtp_port: 465  # SMTP端口（SSL: 465, TLS: 587）
   use_ssl: true   # 使用SSL连接
   sender_email: ""  # 发件人邮箱
