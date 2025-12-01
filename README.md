@@ -74,15 +74,21 @@ sudo apt-get install -y fonts-noto-cjk fonts-wqy-zenhei
 ### 运行
 
 ```bash
-# 使用 FG-CLIP 2 模型（推荐）
+# 使用 FG-CLIP 2 模型，首次运行会下载模型文件（约1.6GB），后续运行即可直接开始检测
 python main.py --config-name=config_fgclip mode=camera camera.index=0
 
 # 使用视频文件测试
-python main.py --config-name=config_fgclip mode=video video_path=assets/test_videos/fall_detection/fall1.mp4
+python main.py --config-name=config_fgclip mode=video video_path=assets/test_videos/fire_detection/fire3.mp4
 
-# 使用原版 CLIP 模型（需配置翻译 API）
-export GEMINI_API_KEY="your_api_key"
-python main.py mode=camera
+# 启用 AI 场景生成（可选，用于自定义场景）
+export GEMINI_API_KEY="your_api_key"  # 推荐使用 Gemini
+# 或 export DEEPSEEK_API_KEY="your_api_key"
+
+# 对于Windows系统，可能需要使用不同的语法：
+set GEMINI_API_KEY=your_api_key
+# 或 set DEEPSEEK_API_KEY=your_api_key
+
+python main.py --config-name=config_fgclip mode=camera
 ```
 
 ## 项目结构
@@ -114,6 +120,7 @@ DLC-Detector-with-Language-Customization/
 │   └── utils/                  # 工具模块
 │       ├── translator.py       # 中文翻译器
 │       ├── config_loader.py    # 配置加载
+│       ├── config_updater.py   # 配置更新器
 │       └── logger.py           # 日志工具
 │
 ├── gui/                        # GUI 模块
@@ -123,11 +130,9 @@ DLC-Detector-with-Language-Customization/
 ├── assets/                     # 资源文件
 │   └── test_videos/            # 测试视频
 │
-├── docs/                       # 文档
-│   ├── FG_CLIP_GUIDE.md        # FG-CLIP 使用指南
-│   └── PROMPT_OPTIMIZATION.md  # Prompt 优化指南
-│
-└── tests/                      # 单元测试
+└── docs/                       # 文档
+    ├── FG_CLIP_GUIDE.md        # FG-CLIP 使用指南
+    └── PROMPT_OPTIMIZATION.md  # Prompt 优化指南
 ```
 
 ## 配置说明
@@ -137,17 +142,40 @@ DLC-Detector-with-Language-Customization/
 在 `config/detection/` 下创建或修改 YAML 文件来自定义检测场景：
 
 ```yaml
+# config/detection/default.yaml
 scenarios:
-  fall:                                    # 场景 ID
+  fall:                                    # 场景 ID（英文键名）
     enabled: true                          # 是否启用
     name: 跌倒检测                          # 显示名称
     prompt: a person has fallen and is lying on the floor  # 检测 Prompt
-    prompt_cn: 有人摔倒躺在地上              # 中文描述（用于显示）
-    threshold: 0.4                         # 检测阈值
+    prompt_cn: 有人摔倒躺在地上              # 中文描述
+    threshold: 0.375                       # 检测阈值（动态计算）
     cooldown: 30                           # 冷却时间（秒）
     consecutive_frames: 2                  # 连续帧要求
     alert_level: high                      # 警报级别 (high/medium/low)
+  
+  fire:
+    enabled: true
+    name: 火灾检测
+    prompt: flames and fire burning with visible smoke
+    prompt_cn: 发生火灾，有火焰和浓烟
+    threshold: 0.375
+    cooldown: 60
+    consecutive_frames: 3
+    alert_level: high
+  
+  normal:                                  # 正常场景（内置保护，不可删除）
+    enabled: true
+    name: 正常场景
+    prompt: an ordinary indoor room with no emergency
+    prompt_cn: 普通室内环境，无异常
+    threshold: 0.99                        # 高阈值，避免误报
+    cooldown: 10
+    consecutive_frames: 1
+    alert_level: low                       # 强制为 low，不触发警报
 ```
+
+> 💡 **提示**：通过 GUI 设置面板可以可视化地启用/禁用场景，配置会自动增量更新。
 
 ### 切换检测配置
 
@@ -159,14 +187,38 @@ python main.py --config-name=config_fgclip detection=elderly_care mode=camera
 python main.py --config-name=config_fgclip detection=minimal mode=camera
 ```
 
+### 邮件警报配置
+
+当检测到 `alert_level: high` 的场景时，系统可自动发送邮件通知。在 `config/alert/default.yaml` 中配置：
+
+```yaml
+email:
+  enabled: true                        # 启用邮件警报
+  smtp_server: "smtp.qq.com"           # SMTP服务器
+  smtp_port: 465                       # SSL端口
+  sender_email: "your@qq.com"          # 发件邮箱
+  sender_password: "授权码"             # 邮箱授权码（非登录密码）
+  recipients: ["family@example.com"]   # 收件人列表
+```
+
+> 💡 **提示**：QQ邮箱需在设置中开启SMTP服务并获取授权码。邮件将附带警报帧截图。
+
 ### Prompt 优化建议
 
 经测试，**英文描述性长句效果最佳**。详见 [Prompt 优化指南](docs/PROMPT_OPTIMIZATION.md)。
 
 | 风格 | 示例 | 效果 |
-|------|------|------|
+|:---:|------|:---:|
 | ✅ 推荐 | `a person has fallen and is lying on the floor` | 0.95 |
 | ❌ 不推荐 | `person falling` | 0.57 |
+
+### GUI 使用
+
+1. **主界面**：左侧视频预览，右侧警报面板（实时显示检测结果）
+2. **设置面板**：点击「设置」可进入场景配置
+   - 勾选/取消勾选场景即可启用/禁用
+   - 点击「新建场景」可用 AI 自动生成配置
+   - 内置场景（跌倒、火灾、正常）不可删除
 
 ## 开发指南
 
@@ -181,9 +233,6 @@ black src/ gui/ tests/
 
 # 代码检查
 flake8 src/ gui/
-
-# 运行测试
-pytest tests/ -v
 ```
 
 ### 添加新检测场景
@@ -225,7 +274,7 @@ class YourModelWrapper:
 
 安装中文字体：
 ```bash
-# Ubuntu/Debian
+# Ubuntu/Debian，当前对于Ubuntu系统支持性较差，请谨慎使用
 sudo apt-get install fonts-noto-cjk fonts-wqy-zenhei
 
 # 刷新字体缓存
@@ -251,13 +300,38 @@ python main.py --config-name=config_fgclip detection=minimal camera.width=640 ca
 ```
 </details>
 
+<details>
+<summary><b>Q: 如何使用 AI 生成自定义场景？</b></summary>
+
+1. 设置 API 密钥环境变量：
+```bash
+export GEMINI_API_KEY="your_key"  # 优先使用
+# 或
+export DEEPSEEK_API_KEY="your_key"
+```
+2. 在 GUI 设置面板点击「新建场景」
+3. 输入场景名称（如"打架检测"），AI 将自动生成配置
+</details>
+
+<details>
+<summary><b>Q: 检测效果不理想？</b></summary>
+
+- 使用**英文描述性长句**作为 Prompt
+- 调整 `threshold` 值（降低可提高召回率，升高可减少误报）
+- 确保 `normal` 场景已启用，作为对比基准
+</details>
+
 ## 贡献者
 
 本项目由上海交通大学 2025 级本科生团队开发：
 
 - 开发团队成员
 
-欢迎提交 Issue 和 Pull Request！
+欢迎提交 Issue 和 Pull Request！我们特别鼓励您进行下面的增量式更新并且提交PR：
+
+  - 隐私保护：在边缘设备+服务器的计算情境，如何保持摄像头视觉信息可能携带的用户隐私的安全性？您可以尝试使用稀疏视觉输入。
+  - 更加开盒即用：可以简化当前的运行逻辑，把更多自由度交给GUI
+  - 跨终端GUI与应用：可以开发针对Linux、安卓、iOS的GUI和通讯、计算机制
 
 
 
@@ -270,6 +344,8 @@ python main.py --config-name=config_fgclip detection=minimal camera.width=640 ca
 - [OpenAI CLIP](https://github.com/openai/CLIP)
 - [FG-CLIP 2 (Qihoo 360)](https://github.com/360CVGroup/FG-CLIP)
 - [Hydra](https://hydra.cc/)
+- [Google Gemini API](https://ai.google.dev/)
+- [DeepSeek API](https://www.deepseek.com/)
 
 
 ---

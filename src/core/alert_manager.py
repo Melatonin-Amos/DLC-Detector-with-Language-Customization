@@ -3,8 +3,9 @@
 
 功能：
 - 接收检测结果并触发警报
-- 支持多种输出方式（控制台、日志、保存图像）
+- 支持多种输出方式（控制台、日志、保存图像、邮件）
 - 管理警报历史和统计
+- 对高级别警报(alert_level: high)发送邮件通知
 """
 
 import logging
@@ -14,6 +15,8 @@ from datetime import datetime
 from typing import Dict, Optional
 import cv2
 import numpy as np
+
+from src.alert.email_sender import EmailSender
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +47,10 @@ class AlertManager:
             
         self.add_annotation = config.get('save_frame', {}).get('add_annotation', True)
         
+        # 初始化邮件发送器（仅对high级别警报启用）
+        email_config = config.get('email', {})
+        self.email_sender = EmailSender(email_config)
+        
         logger.info("✅ 警报管理器初始化完成")
     
     def trigger_alert(self, result: Dict, frame: Optional[np.ndarray] = None):
@@ -57,7 +64,7 @@ class AlertManager:
         # 过滤normal/普通场景（不报警）
         scenario_name = result.get('scenario_name', '').lower()
         if scenario_name in ['normal', '普通', '正常']:
-            self.logger.debug(f"跳过普通场景警报: {result['scenario_name']}")
+            logger.debug(f"跳过普通场景警报: {result['scenario_name']}")
             return
         
         timestamp = datetime.now()
@@ -85,6 +92,10 @@ class AlertManager:
         # 3. 保存警报帧
         if self.save_frame_enabled and frame is not None:
             self._save_alert_frame(alert_info, frame)
+        
+        # 4. 发送邮件警报（仅对high级别）
+        if alert_info['alert_level'] == 'high':
+            self.email_sender.send_alert(alert_info, frame)
     
     def _print_alert(self, alert_info: Dict):
         """打印警报到控制台（支持彩色输出）"""
