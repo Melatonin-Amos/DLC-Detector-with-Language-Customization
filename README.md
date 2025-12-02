@@ -95,44 +95,44 @@ python main.py --config-name=config_fgclip mode=camera
 
 ```
 DLC-Detector-with-Language-Customization/
-├── main.py                     # 程序入口
-├── requirements.txt            # 依赖列表
+├── main.py                       # 程序入口
+├── requirements.txt              # 依赖列表
 │
-├── config/                     # Hydra 配置文件
-│   ├── config.yaml             # CLIP 模型主配置
-│   ├── config_fgclip.yaml      # FG-CLIP 2 模型主配置
-│   ├── camera/                 # 摄像头配置
-│   ├── model/                  # 模型参数配置
-│   ├── detection/              # 检测场景配置
-│   │   ├── default.yaml        # 默认场景（跌倒/火灾）
-│   │   ├── elderly_care.yaml   # 养老场景扩展
-│   │   └── minimal.yaml        # 精简场景
-│   └── alert/                  # 警报配置
+├── config/                       # Hydra 配置文件
+│   ├── config.yaml               # CLIP 模型主配置
+│   ├── config_fgclip.yaml        # FG-CLIP 2 模型主配置
+│   ├── camera/                   # 摄像头配置
+│   ├── model/                    # 模型参数配置
+│   ├── detection/                # 检测场景配置
+│   │   ├── default.yaml          # 默认场景（跌倒/火灾）
+│   │   ├── elderly_care.yaml     # 养老场景扩展
+│   │   └── minimal.yaml          # 精简场景
+│   └── alert/                    # 警报配置
 │
-├── src/                        # 核心源码
-│   ├── core/                   # 核心模块
-│   │   ├── clip_detector.py    # 场景检测器
-│   │   ├── video_stream.py     # 视频流处理
-│   │   └── alert_manager.py    # 警报管理
-│   ├── models/                 # 模型封装
-│   │   ├── clip_wrapper.py     # CLIP 模型封装
-│   │   └── fgclip_wrapper.py   # FG-CLIP 2 封装
-│   └── utils/                  # 工具模块
-│       ├── translator.py       # 中文翻译器
-│       ├── config_loader.py    # 配置加载
-│       ├── config_updater.py   # 配置更新器
-│       └── logger.py           # 日志工具
+├── src/                          # 核心源码
+│   ├── core/                     # 核心模块
+│   │   ├── clip_detector.py      # 场景检测器
+│   │   ├── video_stream.py       # 视频流处理
+│   │   └── alert_manager.py      # 警报管理
+│   ├── models/                   # 模型封装
+│   │   ├── clip_wrapper.py       # CLIP 模型封装
+│   │   └── fgclip_wrapper.py     # FG-CLIP 2 封装
+│   └── utils/                    # 工具模块
+│       ├── translator.py         # 中文翻译器
+│       ├── config_loader.py      # 配置加载
+│       ├── config_updater.py     # 配置更新器
+│       └── logger.py             # 日志工具
 │
-├── gui/                        # GUI 模块
-│   ├── main_window.py          # 主窗口
-│   └── settings_panel.py       # 设置面板
+├── gui/                          # GUI 模块
+│   ├── main_window.py            # 主窗口
+│   └── settings_panel.py         # 设置面板
 │
-├── assets/                     # 资源文件
-│   └── test_videos/            # 测试视频
+├── assets/                       # 资源文件
+│   └── test_videos/              # 测试视频
 │
-└── docs/                       # 文档
-    ├── FG_CLIP_GUIDE.md        # FG-CLIP 使用指南
-    └── PROMPT_OPTIMIZATION.md  # Prompt 优化指南
+└── docs/                         # 文档
+    ├── FG_CLIP_GUIDE.md          # FG-CLIP 使用指南
+    └── PROMPT_OPTIMIZATION.md    # Prompt 优化指南
 ```
 
 ## 配置说明
@@ -144,15 +144,15 @@ DLC-Detector-with-Language-Customization/
 ```yaml
 # config/detection/default.yaml
 scenarios:
-  fall:                                    # 场景 ID（英文键名）
-    enabled: true                          # 是否启用
-    name: 跌倒检测                          # 显示名称
+  fall:                                         # 场景 ID（英文键名）
+    enabled: true                               # 是否启用
+    name: 跌倒检测                               # 显示名称
     prompt: a person has fallen and is lying on the floor  # 检测 Prompt
-    prompt_cn: 有人摔倒躺在地上              # 中文描述
-    threshold: 0.375                       # 检测阈值（动态计算）
-    cooldown: 30                           # 冷却时间（秒）
-    consecutive_frames: 2                  # 连续帧要求
-    alert_level: high                      # 警报级别 (high/medium/low)
+    prompt_cn: 有人摔倒躺在地上                  # 中文描述
+    threshold: 0.375                            # 检测阈值（动态计算）
+    cooldown: 30                                # 冷却时间（秒）
+    consecutive_frames: 2                       # 连续帧要求
+    alert_level: high                           # 警报级别 (high/medium/low)
   
   fire:
     enabled: true
@@ -164,15 +164,15 @@ scenarios:
     consecutive_frames: 3
     alert_level: high
   
-  normal:                                  # 正常场景（内置保护，不可删除）
-    enabled: true
+  normal:                                       # 正常场景（内置保护，不可删除）
+    enabled: true 
     name: 正常场景
     prompt: an ordinary indoor room with no emergency
     prompt_cn: 普通室内环境，无异常
-    threshold: 0.99                        # 高阈值，避免误报
+    threshold: 0.99                             # 高阈值，避免误报
     cooldown: 10
     consecutive_frames: 1
-    alert_level: low                       # 强制为 low，不触发警报
+    alert_level: low                            # 强制为 low，不触发警报
 ```
 
 > 💡 **提示**：通过 GUI 设置面板可以可视化地启用/禁用场景，配置会自动增量更新。
