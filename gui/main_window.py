@@ -18,6 +18,21 @@ import os
 if __name__ == "__main__":
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# 修复 torch.compiler.is_compiling 兼容性问题
+# PyTorch 2.2.x 没有 is_compiling 函数，但 transformers 4.57+ 需要它
+try:
+    import torch
+
+    if hasattr(torch, "compiler") and not hasattr(torch.compiler, "is_compiling"):
+
+        def _is_compiling_stub():
+            """返回 False 的存根函数，用于兼容旧版本 PyTorch"""
+            return False
+
+        torch.compiler.is_compiling = _is_compiling_stub
+except Exception:
+    pass  # 如果 torch 未安装，稍后会报错
+
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 from typing import Dict, Optional
@@ -780,9 +795,11 @@ class MainWindow:
             print(f"⚠️  设置窗口图标加载失败: {e}")
 
         self.settings_panel = SettingsPanel(self.settings_window, self.app_config)
-        
+
         # 注册场景变化回调（用于检测器热重载）
-        self.settings_panel.set_scenarios_changed_callback(self._reload_detector_scenarios)
+        self.settings_panel.set_scenarios_changed_callback(
+            self._reload_detector_scenarios
+        )
 
         # 启动场景变化监听器
         if self.config_updater:
@@ -1129,27 +1146,27 @@ class MainWindow:
                 config_updater = self.settings_panel.get_config_updater()
                 if config_updater is None:
                     config_updater = self.config_updater
-                
+
                 # 增量更新配置文件（只修改 enabled 字段）
                 if config_updater:
                     config_updater.update_scenarios(
                         all_scenes=all_scenes, selected_scenes=sorted(new_scenes)
                     )
-                
+
                 # 通知检测器重新加载场景配置（热重载）
                 self._reload_detector_scenarios()
 
     def _reload_detector_scenarios(self) -> None:
         """
         通知检测器热重载场景配置
-        
+
         当用户通过 GUI 修改场景配置后，检测器需要重新加载
         以反映最新的场景定义和阈值设置
         """
-        if hasattr(self, 'detector') and self.detector is not None:
+        if hasattr(self, "detector") and self.detector is not None:
             try:
                 # 调用检测器的热重载方法
-                if hasattr(self.detector, 'reload_scenarios'):
+                if hasattr(self.detector, "reload_scenarios"):
                     success = self.detector.reload_scenarios()
                     if success:
                         print("✅ 检测器场景配置已热重载")
