@@ -7,7 +7,7 @@ scenarios:
     name: 跌倒检测
     prompt: a person has fallen and is lying on the floor
     prompt_cn: 有人摔倒躺在地上
-    threshold: 0.4
+    threshold: 0.375
     cooldown: 30
     consecutive_frames: 2
     alert_level: high
@@ -29,3 +29,13 @@ scenarios:
     cooldown: 10
     consecutive_frames: 1
     alert_level: low
+  flood:
+    enabled: true
+    name: 水淹检测
+    prompt: water flooding the area, with rising water levels and submerged objects,
+      potential overflow
+    prompt_cn: 水淹没区域，水位上升，物体被淹没，存在溢出的可能性
+    threshold: 0.375
+    cooldown: 60
+    consecutive_frames: 3
+    alert_level: high
