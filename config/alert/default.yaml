@@ -28,5 +28,5 @@ email:
   use_ssl: true   # 使用SSL连接
   sender_email: ""  # 发件人邮箱
   sender_password: ""  # 发件人邮箱授权码（非登录密码）
-  recipients: []  # 收件人邮箱列表（修改为您的实际邮箱）
+  recipients: []  # 收件人邮箱列表（修改为您需要的所有收件邮箱）
   subject_prefix: "[DLC警报]"  # 邮件主题前缀
