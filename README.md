@@ -67,89 +67,18 @@ conda activate dlc
 # 安装依赖
 pip install -r requirements.txt
 
-# 安装中文字体（GUI 显示需要）- 一键安装脚本
-python scripts/install_fonts.py
+# Linux 用户安装中文字体（GUI 显示需要）
+# Ubuntu/Debian:
+sudo apt-get install -y fonts-noto-cjk fonts-wqy-zenhei && fc-cache -fv
+
+# CentOS/Fedora:
+sudo dnf install -y google-noto-sans-cjk-fonts && fc-cache -fv
+
+# Arch:
+sudo pacman -S noto-fonts-cjk && fc-cache -fv
 ```
 
-### 字体安装说明
-
-GUI 界面需要中文字体支持。系统会自动检测并选择当前平台的最佳字体，但某些系统可能需要手动安装：
-
-<details>
-<summary><b>🪟 Windows</b></summary>
-
-通常无需安装，系统自带微软雅黑（Microsoft YaHei）。
-
-如果中文显示异常：
-1. 打开「设置」→「个性化」→「字体」
-2. 搜索「微软雅黑」或「Microsoft YaHei」
-3. 如未安装，可从 Microsoft 官网下载
-</details>
-
-<details>
-<summary><b>🐧 Linux (Ubuntu/Debian)</b></summary>
-
-```bash
-# 使用安装脚本
-python scripts/install_fonts.py
-
-# 或手动安装
-sudo apt-get update
-sudo apt-get install -y fonts-noto-cjk fonts-noto-cjk-extra fonts-wqy-zenhei fonts-wqy-microhei
-fc-cache -fv
-```
-</details>
-
-<details>
-<summary><b>🐧 Linux (CentOS/RHEL/Fedora)</b></summary>
-
-```bash
-# 使用安装脚本
-python scripts/install_fonts.py
-
-# 或手动安装
-sudo dnf install -y google-noto-sans-cjk-fonts google-noto-serif-cjk-fonts wqy-zenhei-fonts
-fc-cache -fv
-```
-</details>
-
-<details>
-<summary><b>🐧 Linux (Arch)</b></summary>
-
-```bash
-# 使用安装脚本
-python scripts/install_fonts.py
-
-# 或手动安装
-sudo pacman -S noto-fonts-cjk wqy-zenhei wqy-microhei
-fc-cache -fv
-```
-</details>
-
-<details>
-<summary><b>🍎 macOS</b></summary>
-
-通常无需安装，系统自带苹方字体（PingFang SC）。
-
-如果中文显示异常：
-1. 打开「字体册」应用
-2. 检查「苹方」或「PingFang」字体是否已安装
-</details>
-
-### 自定义字体配置
-
-字体配置存储在 `config/gui_fonts.yaml` 中，您可以根据需要修改：
-
-```yaml
-# 修改字体大小
-font_styles:
-  normal:
-    size: 14  # 默认为 12
-    weight: "bold"
-
-# 修改标题颜色
-title_color: "#34495e"  # 默认为 "#2c3e50"
-```
+> 💡 **提示**：Windows 和 macOS 自带中文字体，无需安装。字体配置可在 `config/gui_fonts.yaml` 中修改。
 
 ### 运行
 
@@ -210,7 +139,6 @@ DLC-Detector-with-Language-Customization/
 │   └── settings_panel.py         # 设置面板
 │
 ├── scripts/                      # 脚本工具
-│   ├── install_fonts.py          # 字体安装脚本（跨平台）
 │   ├── download_models.py        # 模型下载脚本
 │   └── run_demo.py               # 演示脚本
 │
@@ -359,17 +287,13 @@ class YourModelWrapper:
 <details>
 <summary><b>Q: GUI 中文显示为方框？</b></summary>
 
-使用一键安装脚本自动安装中文字体：
+Linux 用户需安装中文字体：
 ```bash
-python scripts/install_fonts.py
+# Ubuntu/Debian
+sudo apt-get install -y fonts-noto-cjk fonts-wqy-zenhei && fc-cache -fv
 ```
 
-或手动安装（参见上方「字体安装说明」）。
-
-检查当前字体状态：
-```bash
-python scripts/install_fonts.py --check
-```
+Windows/macOS 通常自带中文字体，无需安装。
 </details>
 
 <details>
