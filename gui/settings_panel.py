@@ -21,6 +21,7 @@ import os
 # 添加项目根目录到路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.utils.config_updater import ConfigUpdater, PROTECTED_SCENE_NAMES
+from src.utils.font_loader import FontLoader
 import yaml
 
 
@@ -61,11 +62,7 @@ class SettingsPanel:
                 "scene": {
                     "scene_type": "摔倒",  # 保留用于向后兼容
                     "selected_scenes": ["摔倒"],  # 新增：用户选择的多个场景
-                    "light_condition": "normal",
-                    "enable_roi": False,
-                    "enable_sound": True,
                     "enable_email": False,
-                    "auto_record": False,
                 },
                 "scene_types": ["摔倒", "起火"],
             }
@@ -235,18 +232,16 @@ class SettingsPanel:
         return None
 
     def _setup_fonts(self) -> None:
-        """配置字体和样式"""
-        # 强制使用微软雅黑，全部加粗
-        self.font_family = "Microsoft YaHei"
-
-        # 定义不同用途的字体 - 全部加粗，字号加大
-        self.fonts = {
-            "normal": (self.font_family, 12, "bold"),
-            "title": (self.font_family, 16, "bold"),
-            "large": (self.font_family, 18, "bold"),
-            "small": (self.font_family, 11, "bold"),
-            "italic": (self.font_family, 12, "bold"),
-        }
+        """配置字体和样式 - 从配置文件加载，支持跨平台"""
+        # 使用 FontLoader 从配置文件加载字体设置
+        # 配置文件位置: config/gui_fonts.yaml
+        self.font_loader = FontLoader()
+        
+        # 获取当前平台的主字体族（自动回退到备用字体）
+        self.font_family = self.font_loader.get_font_family()
+        
+        # 获取所有字体配置（从配置文件加载）
+        self.fonts = self.font_loader.get_all_fonts()
 
         # 配置ttk样式
         style = ttk.Style()
@@ -448,24 +443,6 @@ class SettingsPanel:
             width=12,
         ).pack(side=tk.LEFT, padx=(10, 0))
 
-        # 分辨率
-        resolution_frame = ttk.Frame(camera_section)
-        resolution_frame.pack(fill=tk.X, pady=(0, 8))
-
-        ttk.Label(resolution_frame, text="分辨率:", width=12, anchor="w").pack(
-            side=tk.LEFT
-        )
-        self.resolution_var = tk.StringVar(
-            value=self.app_config.get("camera", {}).get("resolution", "1280x720")
-        )
-        ttk.Combobox(
-            resolution_frame,
-            textvariable=self.resolution_var,
-            values=["640x480", "1280x720", "1920x1080"],
-            state="readonly",
-            width=15,
-        ).pack(side=tk.LEFT, padx=(10, 0))
-
         # 按钮区域 - 增加间距
         button_frame = ttk.Frame(frame)
         button_frame.pack(fill=tk.X, pady=(15, 0))
@@ -492,7 +469,6 @@ class SettingsPanel:
             title="选择视频文件",
             filetypes=[
                 ("视频文件", "*.mp4 *.avi *.mkv *.mov *.wmv *.flv"),
-                ("所有文件", "*.*"),
             ],
         )
         if file_path:
@@ -518,7 +494,6 @@ class SettingsPanel:
         self.app_config["video"]["loop_play"] = self.loop_play_var.get()
         self.app_config["video"]["default_speed"] = self.default_speed_var.get()
         self.app_config["camera"]["camera_index"] = self.camera_index_var.get()
-        self.app_config["camera"]["resolution"] = self.resolution_var.get()
 
         messagebox.showinfo("保存成功", "视频配置已保存")
         print(
@@ -589,41 +564,6 @@ class SettingsPanel:
         params_frame = ttk.LabelFrame(frame, text="通用场景参数", padding=15)
         params_frame.pack(fill=tk.X, pady=(0, 15))
 
-        # 光照条件
-        light_frame = ttk.Frame(params_frame)
-        light_frame.pack(fill=tk.X, pady=(0, 15))
-
-        ttk.Label(light_frame, text="光照条件:", width=12, anchor="w").pack(
-            side=tk.LEFT
-        )
-        self.light_condition_var = tk.StringVar(
-            value=self.app_config.get("scene", {}).get("light_condition", "normal")
-        )
-        ttk.Radiobutton(
-            light_frame, text="明亮", variable=self.light_condition_var, value="bright"
-        ).pack(side=tk.LEFT, padx=(10, 15))
-        ttk.Radiobutton(
-            light_frame, text="正常", variable=self.light_condition_var, value="normal"
-        ).pack(side=tk.LEFT, padx=(0, 15))
-        ttk.Radiobutton(
-            light_frame, text="昏暗", variable=self.light_condition_var, value="dim"
-        ).pack(side=tk.LEFT)
-
-        # 检测区域
-        area_frame = ttk.Frame(params_frame)
-        area_frame.pack(fill=tk.X, pady=(0, 15))
-
-        ttk.Label(area_frame, text="检测区域:", width=12, anchor="w").pack(side=tk.LEFT)
-        self.enable_roi_var = tk.BooleanVar(
-            value=self.app_config.get("scene", {}).get("enable_roi", False)
-        )
-        ttk.Checkbutton(
-            area_frame,
-            text="启用感兴趣区域(ROI)",
-            variable=self.enable_roi_var,
-            command=self._toggle_roi,
-        ).pack(side=tk.LEFT, padx=(10, 0))
-
         # 报警设置
         alarm_frame = ttk.Frame(params_frame)
         alarm_frame.pack(fill=tk.X, pady=(0, 15))
@@ -645,30 +585,9 @@ class SettingsPanel:
             alarm_frame, text="短信通知", variable=self.enable_email_var
         ).pack(side=tk.LEFT)
 
-        # 录像设置
-        record_frame = ttk.Frame(params_frame)
-        record_frame.pack(fill=tk.X, pady=(0, 10))
-
-        ttk.Label(record_frame, text="录像设置:", width=12, anchor="w").pack(
-            side=tk.LEFT
-        )
-        self.auto_record_var = tk.BooleanVar(
-            value=self.app_config.get("scene", {}).get("auto_record", False)
-        )
-        ttk.Checkbutton(
-            record_frame, text="事件触发时自动录像", variable=self.auto_record_var
-        ).pack(side=tk.LEFT, padx=(10, 0))
-
         # 按钮区域
         scene_button_frame = ttk.Frame(frame)
         scene_button_frame.pack(fill=tk.X, pady=(15, 10))
-
-        ttk.Button(
-            scene_button_frame,
-            text="设置ROI区域",
-            command=self._set_roi_area,
-            style="Action.TButton",
-        ).pack(side=tk.LEFT, padx=(0, 15))
 
         ttk.Button(
             scene_button_frame,
@@ -772,21 +691,41 @@ class SettingsPanel:
         dialog.transient(self.parent)
         dialog.grab_set()
 
-        # 创建输入框架 - 增加边距
-        input_frame = ttk.Frame(dialog, padding=40)
-        input_frame.pack(fill=tk.BOTH, expand=True)
+        # 创建滚动容器
+        canvas = tk.Canvas(dialog, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(dialog, orient="vertical", command=canvas.yview)
+        
+        # 创建输入框架
+        input_frame = ttk.Frame(canvas, padding=(40, 20))
+        
+        # 配置滚动
+        def on_frame_configure(event):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+        
+        input_frame.bind("<Configure>", on_frame_configure)
+        canvas.create_window((0, 0), window=input_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        # 布局滚动条和画布
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # 鼠标滚轮绑定
+        def on_mousewheel(event):
+            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+        canvas.bind_all("<MouseWheel>", on_mousewheel)
 
         # 说明标签
         ttk.Label(
             input_frame, text="请输入新场景的名称：", font=self.fonts["title"]
-        ).pack(pady=(10, 25))
+        ).pack(pady=(10, 15))
 
         # 场景名称输入框
         scene_name_var = tk.StringVar()
         name_entry = ttk.Entry(
             input_frame, textvariable=scene_name_var, font=self.fonts["title"], width=30
         )
-        name_entry.pack(pady=(0, 20), ipady=5)
+        name_entry.pack(pady=(0, 10), ipady=5)
         name_entry.focus()
 
         # 提示文字
@@ -795,7 +734,7 @@ class SettingsPanel:
             text="例如：跌倒、起火、闯入等",
             font=self.fonts["small"],
             foreground="gray",
-        ).pack(pady=(0, 35))
+        ).pack(pady=(0, 15))
 
         # 状态标签（用于显示生成中状态）
         status_label = ttk.Label(
@@ -804,11 +743,11 @@ class SettingsPanel:
             font=self.fonts["small"],
             foreground="blue",
         )
-        status_label.pack(pady=(0, 15))
+        status_label.pack(pady=(0, 10))
 
         # 按钮框架（居中）
         button_frame = ttk.Frame(input_frame)
-        button_frame.pack(pady=(15, 0))
+        button_frame.pack(pady=(10, 15))
 
         confirm_btn = ttk.Button(
             button_frame, text="✓ 确定", width=12, style="Action.TButton"
@@ -819,9 +758,17 @@ class SettingsPanel:
             button_frame, text="✕ 取消", width=12, style="Action.TButton"
         )
         cancel_btn.pack(side=tk.LEFT, padx=15)
+        
+        # 窗口关闭时解绑鼠标滚轮
+        def on_dialog_close():
+            canvas.unbind_all("<MouseWheel>")
+            dialog.destroy()
+        
+        dialog.protocol("WM_DELETE_WINDOW", on_dialog_close)
 
         def on_timeout():
             """超时时的回调"""
+            canvas.unbind_all("<MouseWheel>")
             dialog.destroy()  # 关闭新建场景窗口
             messagebox.showwarning(
                 "AI 生成超时",
@@ -954,6 +901,7 @@ class SettingsPanel:
                         f"场景 '{scene_name}' 已成功创建\n配置已自动生成并保存",
                         parent=dialog,
                     )
+                    canvas.unbind_all("<MouseWheel>")
                     dialog.destroy()
                 else:
                     status_label.config(text="❌ 配置保存失败", foreground="red")
@@ -974,6 +922,7 @@ class SettingsPanel:
 
         def on_cancel():
             """取消创建"""
+            canvas.unbind_all("<MouseWheel>")
             dialog.destroy()
 
         # 绑定按钮命令
@@ -1072,18 +1021,6 @@ class SettingsPanel:
                 f"已成功删除 {len(selected_scenes)} 个场景\n配置文件已同步更新",
             )
 
-    def _toggle_roi(self) -> None:
-        """切换ROI启用状态"""
-        enabled = self.enable_roi_var.get()
-        print(f"ROI {'启用' if enabled else '禁用'}")
-
-    def _set_roi_area(self) -> None:
-        """设置ROI区域"""
-        messagebox.showinfo(
-            "设置ROI", "ROI区域设置功能待实现\n将打开视频预览窗口进行区域选择"
-        )
-        # TODO: 实现ROI区域选择界面
-
     def _save_scene_config(self) -> None:
         """保存场景配置"""
         # 更新选中的场景列表
@@ -1097,11 +1034,8 @@ class SettingsPanel:
             self.app_config["scene"]["scene_type"] = selected[0]
 
         # 更新其他配置
-        self.app_config["scene"]["light_condition"] = self.light_condition_var.get()
-        self.app_config["scene"]["enable_roi"] = self.enable_roi_var.get()
         self.app_config["scene"]["enable_sound"] = self.enable_sound_var.get()
         self.app_config["scene"]["enable_email"] = self.enable_email_var.get()
-        self.app_config["scene"]["auto_record"] = self.auto_record_var.get()
 
         scene_info = f"已选场景: {', '.join(selected) if selected else '无'}"
         messagebox.showinfo("保存成功", f"场景配置已保存\n\n{scene_info}")
@@ -1173,11 +1107,8 @@ class SettingsPanel:
             {
                 "scene_type": str,              # 第一个选中的场景（向后兼容）
                 "selected_scenes": list[str],   # 所有选中的场景列表（新增）
-                "light_condition": str,         # 光照条件：'bright' | 'normal' | 'dim'
-                "enable_roi": bool,             # 是否启用ROI
                 "enable_sound": bool,           # 是否启用声音报警
                 "enable_email": bool,           # 是否启用短信通知
-                "auto_record": bool,            # 是否自动录像
             }
 
         Example:
@@ -1185,8 +1116,6 @@ class SettingsPanel:
             >>> config = panel.get_scene_config()
             >>> print(config["scene_type"])        # "摔倒"（第一个）
             >>> print(config["selected_scenes"])   # ["摔倒", "起火"]（所有）
-            >>> print(config["light_condition"])   # "normal"
-            >>> print(config["enable_roi"])        # False
         """
         selected = self.app_config["scene"]["selected_scenes"]
         return {
@@ -1196,51 +1125,8 @@ class SettingsPanel:
                 else (self.scene_types[0] if self.scene_types else "")
             ),
             "selected_scenes": selected.copy(),
-            "light_condition": self.light_condition_var.get(),
-            "enable_roi": self.enable_roi_var.get(),
             "enable_sound": self.enable_sound_var.get(),
             "enable_email": self.enable_email_var.get(),
-            "auto_record": self.auto_record_var.get(),
-        }
-
-    def get_light_condition(self) -> str:
-        """
-        获取当前光照条件设置
-
-        Returns:
-            str: 光照条件，可能的值: 'bright'（明亮）、'normal'（正常）、'dim'（昏暗）
-
-        Example:
-            >>> panel = SettingsPanel(root)
-            >>> light = panel.get_light_condition()
-            >>> if light == "dim":
-            ...     # 调整检测算法的灵敏度
-        """
-        return self.light_condition_var.get()
-
-    def get_roi_settings(self) -> Dict:
-        """
-        获取ROI（感兴趣区域）相关设置
-
-        Returns:
-            Dict: ROI设置字典
-
-        Dictionary Structure:
-            {
-                "enabled": bool,     # 是否启用ROI
-                "coordinates": None  # ROI坐标（待实现，目前为None）
-            }
-
-        Example:
-            >>> panel = SettingsPanel(root)
-            >>> roi = panel.get_roi_settings()
-            >>> if roi["enabled"]:
-            ...     # 只在ROI区域内进行检测
-            ...     coords = roi["coordinates"]
-        """
-        return {
-            "enabled": self.enable_roi_var.get(),
-            "coordinates": None,  # TODO: 实现ROI坐标存储
         }
 
     def get_alert_settings(self) -> Dict:
@@ -1254,7 +1140,6 @@ class SettingsPanel:
             {
                 "sound": bool,    # 是否启用声音报警
                 "email": bool,    # 是否启用邮件通知
-                "record": bool,   # 是否自动录像
             }
 
         Example:
@@ -1264,13 +1149,9 @@ class SettingsPanel:
             ...     play_alert_sound()
             >>> if alerts["email"]:
             ...     send_email_notification()
-            >>> if alerts["record"]:
-            ...     start_recording()
         """
         return {
-            "sound": self.enable_sound_var.get(),
             "email": self.enable_email_var.get(),
-            "record": self.auto_record_var.get(),
         }
 
     def set_scene_type(self, scene_type: str) -> bool:
@@ -1380,25 +1261,20 @@ class SettingsPanel:
             config: 配置字典，可以包含以下任意键：
                 - scene_type: str（单个场景，向后兼容）
                 - selected_scenes: list[str]（多个场景，新增）
-                - light_condition: str ('bright' | 'normal' | 'dim')
-                - enable_roi: bool
                 - enable_sound: bool
                 - enable_email: bool
-                - auto_record: bool
 
         Example:
             >>> panel = SettingsPanel(root)
             >>> # 方式1：单场景（向后兼容）
             >>> panel.update_scene_config({
             ...     "scene_type": "起火",
-            ...     "light_condition": "bright",
             ...     "enable_sound": True
             ... })
             >>>
             >>> # 方式2：多场景（推荐）
             >>> panel.update_scene_config({
             ...     "selected_scenes": ["摔倒", "起火", "闯入"],
-            ...     "light_condition": "normal",
             ...     "enable_email": True
             ... })
         """
@@ -1425,20 +1301,11 @@ class SettingsPanel:
                 for s, var in self.scene_checkbox_vars.items():
                     var.set(s == scene)
 
-        if "light_condition" in config:
-            self.light_condition_var.set(config["light_condition"])
-
-        if "enable_roi" in config:
-            self.enable_roi_var.set(config["enable_roi"])
-
         if "enable_sound" in config:
             self.enable_sound_var.set(config["enable_sound"])
 
         if "enable_email" in config:
             self.enable_email_var.set(config["enable_email"])
-
-        if "auto_record" in config:
-            self.auto_record_var.set(config["auto_record"])
 
     # ========== 配置监听接口 ==========
 
@@ -1457,11 +1324,8 @@ class SettingsPanel:
                 "detection_interval": float,     # 检测间隔
                 "camera_id": int,               # 摄像头ID
                 "alert_delay": float,           # 告警延迟
-                "light_condition": str,         # 光照条件
-                "enable_roi": bool,             # 是否启用ROI
                 "enable_sound": bool,           # 是否启用声音报警
                 "enable_email": bool,           # 是否启用邮件通知
-                "auto_record": bool,            # 是否自动录像
             }
 
         Example:
@@ -1483,11 +1347,7 @@ class SettingsPanel:
             "detection_interval": scene_config.get("detection_interval"),
             "camera_id": scene_config.get("camera_id"),
             "alert_delay": scene_config.get("alert_delay"),
-            "light_condition": self.light_condition_var.get(),
-            "enable_roi": self.enable_roi_var.get(),
-            "enable_sound": self.enable_sound_var.get(),
             "enable_email": self.enable_email_var.get(),
-            "auto_record": self.auto_record_var.get(),
         }
 
     def start_config_monitor(
@@ -1598,11 +1458,7 @@ class SettingsPanel:
 
         # 场景参数
         print(f"\n🎨 场景参数:")
-        print(f"   • 光照条件: {scene_config.get('light_condition', 'N/A')}")
-        print(f"   • 启用ROI: {'是' if scene_config.get('enable_roi') else '否'}")
-        print(f"   • 声音报警: {'是' if scene_config.get('enable_sound') else '否'}")
         print(f"   • 邮件通知: {'是' if scene_config.get('enable_email') else '否'}")
-        print(f"   • 自动录像: {'是' if scene_config.get('auto_record') else '否'}")
         print("=" * 60 + "\n")
 
     def print_current_config(self) -> None:

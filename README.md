@@ -68,8 +68,17 @@ conda activate dlc
 pip install -r requirements.txt
 
 # Linux 用户安装中文字体（GUI 显示需要）
-sudo apt-get install -y fonts-noto-cjk fonts-wqy-zenhei
+# Ubuntu/Debian:
+sudo apt-get install -y fonts-noto-cjk fonts-wqy-zenhei && fc-cache -fv
+
+# CentOS/Fedora:
+sudo dnf install -y google-noto-sans-cjk-fonts && fc-cache -fv
+
+# Arch:
+sudo pacman -S noto-fonts-cjk && fc-cache -fv
 ```
+
+> 💡 **提示**：Windows 和 macOS 自带中文字体，无需安装。字体配置可在 `config/gui_fonts.yaml` 中修改。
 
 ### 运行
 
@@ -101,6 +110,7 @@ DLC-Detector-with-Language-Customization/
 ├── config/                       # Hydra 配置文件
 │   ├── config.yaml               # CLIP 模型主配置
 │   ├── config_fgclip.yaml        # FG-CLIP 2 模型主配置
+│   ├── gui_fonts.yaml            # GUI 字体配置（跨平台）
 │   ├── camera/                   # 摄像头配置
 │   ├── model/                    # 模型参数配置
 │   ├── detection/                # 检测场景配置
@@ -121,11 +131,16 @@ DLC-Detector-with-Language-Customization/
 │       ├── translator.py         # 中文翻译器
 │       ├── config_loader.py      # 配置加载
 │       ├── config_updater.py     # 配置更新器
+│       ├── font_loader.py        # GUI 字体加载器
 │       └── logger.py             # 日志工具
 │
 ├── gui/                          # GUI 模块
 │   ├── main_window.py            # 主窗口
 │   └── settings_panel.py         # 设置面板
+│
+├── scripts/                      # 脚本工具
+│   ├── download_models.py        # 模型下载脚本
+│   └── run_demo.py               # 演示脚本
 │
 ├── assets/                       # 资源文件
 │   └── test_videos/              # 测试视频
@@ -272,14 +287,31 @@ class YourModelWrapper:
 <details>
 <summary><b>Q: GUI 中文显示为方框？</b></summary>
 
-安装中文字体：
+Linux 用户需安装中文字体：
 ```bash
-# Ubuntu/Debian，当前对于Ubuntu系统支持性较差，请谨慎使用
-sudo apt-get install fonts-noto-cjk fonts-wqy-zenhei
-
-# 刷新字体缓存
-fc-cache -fv
+# Ubuntu/Debian
+sudo apt-get install -y fonts-noto-cjk fonts-wqy-zenhei && fc-cache -fv
 ```
+
+Windows/macOS 通常自带中文字体，无需安装。
+</details>
+
+<details>
+<summary><b>Q: 如何自定义字体配置？</b></summary>
+
+编辑 `config/gui_fonts.yaml` 文件：
+```yaml
+# 修改字体大小
+font_styles:
+  normal:
+    size: 14  # 增大默认字体
+    weight: "bold"
+
+# 修改标题颜色
+title_color: "#1a5276"  # 深蓝色
+```
+
+重启程序后生效。
 </details>
 
 <details>
