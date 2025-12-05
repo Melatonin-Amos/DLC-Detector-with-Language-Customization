@@ -21,7 +21,6 @@ import os
 # 添加项目根目录到路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.utils.config_updater import ConfigUpdater, PROTECTED_SCENE_NAMES
-from src.utils.font_loader import FontLoader
 import yaml
 
 
@@ -232,16 +231,19 @@ class SettingsPanel:
         return None
 
     def _setup_fonts(self) -> None:
-        """配置字体和样式 - 从配置文件加载，支持跨平台"""
-        # 使用 FontLoader 从配置文件加载字体设置
-        # 配置文件位置: config/gui_fonts.yaml
-        self.font_loader = FontLoader()
+        """配置字体和样式 - 硬编码字体设置"""
+        # 字体设置（用户需手动安装字体，见 doc_asset/font/）
+        # 全部使用微软雅黑（设置面板不需要华文中宋）
+        self.font_family = "微软雅黑"
         
-        # 获取当前平台的主字体族（自动回退到备用字体）
-        self.font_family = self.font_loader.get_font_family()
-        
-        # 获取所有字体配置（从配置文件加载）
-        self.fonts = self.font_loader.get_all_fonts()
+        # 定义字体配置
+        self.fonts = {
+            "normal": (self.font_family, 12, "bold"),
+            "title": (self.font_family, 16, "bold"),
+            "large": (self.font_family, 18, "bold"),
+            "small": (self.font_family, 11, "bold"),
+            "italic": (self.font_family, 12, "italic"),  # 斜体用于说明文字
+        }
 
         # 配置ttk样式
         style = ttk.Style()

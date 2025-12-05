@@ -50,7 +50,6 @@ except ImportError:
 
 from gui.settings_panel import SettingsPanel
 from src.utils.config_updater import ConfigUpdater
-from src.utils.font_loader import FontLoader
 
 
 class MainWindow:
@@ -58,10 +57,10 @@ class MainWindow:
 
     # 类常量
     VIDEO_RATIO = 16 / 9  # 视频显示比例
-    SCREEN_RATIO = 0.75  # 窗口占屏幕比例
-    VIDEO_CANVAS_WIDTH = 880  # 固定视频画布宽度（加大）
-    VIDEO_CANVAS_HEIGHT = 495  # 固定视频画布高度（16:9）
-    ALERT_PANEL_WIDTH = 250  # 警报面板宽度（加宽）
+    SCREEN_RATIO = 1  # 窗口占屏幕比例
+    VIDEO_CANVAS_WIDTH = 1200  # 固定视频画布宽度（加大）
+    VIDEO_CANVAS_HEIGHT = 720  # 固定视频画布高度（16:9）
+    ALERT_PANEL_WIDTH = 360  # 警报面板宽度（加宽）
 
     def __init__(self) -> None:
         """初始化主窗口"""
@@ -166,21 +165,26 @@ class MainWindow:
         self.root.after_idle(self._ensure_initial_geometry)
 
     def _setup_fonts(self) -> None:
-        """配置字体和样式 - 从配置文件加载，支持跨平台"""
-        # 使用 FontLoader 从配置文件加载字体设置
-        # 配置文件位置: config/gui_fonts.yaml
-        self.font_loader = FontLoader()
+        """配置字体和样式 - 硬编码字体设置"""
+        # 字体设置（用户需手动安装字体，见 doc_asset/font/）
+        # 标题使用华文中宋，其余使用微软雅黑
+        self.font_family = "微软雅黑"  # 主字体
+        self.title_font_family = "华文中宋"  # 标题字体
         
-        # 获取当前平台的主字体族（自动回退到备用字体）
-        self.font_family = self.font_loader.get_font_family()
+        # 标题颜色
+        self.title_color = "#2c3e50"
         
-        # 获取所有字体配置（从配置文件加载）
-        self.fonts = self.font_loader.get_all_fonts()
+        # 定义字体配置
+        self.fonts = {
+            "normal": (self.font_family, 12, "bold"),
+            "title": (self.font_family, 16, "bold"),
+            "large": (self.font_family, 18, "bold"),
+            "small": (self.font_family, 11, "bold"),
+            "header": (self.title_font_family, 22, "bold"),  # 主标题用华文中宋
+            "replay": (self.font_family, 24, "bold"),
+        }
         
-        # 获取标题颜色（用于艺术标题）
-        self.title_color = self.font_loader.get_title_color()
-        
-        print(f"✓ 字体配置已加载 (平台: {self.font_loader.get_platform()}, 字体: {self.font_family})")
+        print(f"✓ 字体配置已加载 (主字体: {self.font_family}, 标题字体: {self.title_font_family})")
 
         # 配置ttk样式
         style = ttk.Style()
