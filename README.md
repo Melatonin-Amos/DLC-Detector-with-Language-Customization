@@ -67,18 +67,29 @@ conda activate dlc
 # 安装依赖
 pip install -r requirements.txt
 
-# Linux 用户安装中文字体（GUI 显示需要）
-# Ubuntu/Debian:
-sudo apt-get install -y fonts-noto-cjk fonts-wqy-zenhei && fc-cache -fv
+#Windows 用户安装中文字体（GUI 显示需要）
+#创建用户字体目录（如果不存在）
+mkdir "%LOCALAPPDATA%\Microsoft\Windows\Fonts" 2>nul
+#复制字体到用户目录
+copy "doc_asset\font\华文中宋.ttf" "%LOCALAPPDATA%\Microsoft\Windows\Fonts\"
+copy "doc_asset\font\微软雅黑.ttf" "%LOCALAPPDATA%\Microsoft\Windows\Fonts\"
 
-# CentOS/Fedora:
-sudo dnf install -y google-noto-sans-cjk-fonts && fc-cache -fv
+#macOS 用户安装中文字体（GUI 显示需要）
+# 复制到用户字体目录（无需 sudo）
+cp doc_asset/font/华文中宋.ttf ~/Library/Fonts/
+cp doc_asset/font/微软雅黑.ttf ~/Library/Fonts/
+# 或复制到系统字体目录（需 sudo）
+sudo cp doc_asset/font/*.ttf /Library/Fonts/
 
-# Arch:
-sudo pacman -S noto-fonts-cjk && fc-cache -fv
-```
+#Linux 用户安装中文字体（GUI 显示需要）
+# 创建用户字体目录并复制字体
+mkdir -p ~/.local/share/fonts
+cp doc_asset/font/华文中宋.ttf ~/.local/share/fonts/
+cp doc_asset/font/微软雅黑.ttf ~/.local/share/fonts/
+# 刷新字体缓存
+fc-cache -fv
 
-> 💡 **提示**：Windows 和 macOS 自带中文字体，无需安装。字体配置可在 `config/gui_fonts.yaml` 中修改。
+#若安装字体后仍有问题，可能需要重启
 
 ### 运行
 
