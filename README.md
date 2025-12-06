@@ -91,6 +91,7 @@ mkdir -p ~/.local/share/fonts && cp asset/font/*.ttf ~/.local/share/fonts/ && fc
 sudo apt-get install -y fonts-noto-cjk fonts-wqy-zenhei && fc-cache -fv
 
 #若安装字体后仍有问题，可能需要重启
+```
 
 ### 快速运行
 
