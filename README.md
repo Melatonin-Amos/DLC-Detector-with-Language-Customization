@@ -361,7 +361,7 @@ $env:DEEPSEEK_API_KEY="your_deepseek_api_key"
 
 <div align="center">
   <a href="https://github.com/Melatonin-Amos/DLC-Detector-with-Language-Customization/graphs/contributors">
-    <img src="https://contrib.rocks/image?repo=Melatonin-Amos/DLC-Detector-with-Language-Customization" />
+    <img src="https://contrib.rocks/image?repo=Melatonin-Amos/DLC-Detector-with-Language-Customization&v=2" />
   </a>
 </div>
 
@@ -395,7 +395,7 @@ $env:DEEPSEEK_API_KEY="your_deepseek_api_key"
 **代码不仅运行在 CPU 上，也运行在我们的咖啡因和热情之上。**
 
 如果您喜欢这个由 SJTU 大一新生构建的项目，<br>
-请点击右上角的 <img src="https://img.shields.io/github/stars/Melatonin-Amos/DLC-Detector-with-Language-Customization?style=social" alt="star"/> 按钮支持我们！
+请点击右上角的 <img src="https://img.shields.io/github/stars/Melatonin-Amos/DLC-Detector-with-Language-Customization?style=social&refresh=1" alt="star"/> 按钮支持我们！
 
 每一个 Star ⭐️ 都能：
 👉 让我们的头发少掉一根
