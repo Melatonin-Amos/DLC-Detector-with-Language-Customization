@@ -18,6 +18,21 @@ import os
 if __name__ == "__main__":
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# 修复 torch.compiler.is_compiling 兼容性问题
+# PyTorch 2.2.x 没有 is_compiling 函数，但 transformers 4.57+ 需要它
+try:
+    import torch
+
+    if hasattr(torch, "compiler") and not hasattr(torch.compiler, "is_compiling"):
+
+        def _is_compiling_stub():
+            """返回 False 的存根函数，用于兼容旧版本 PyTorch"""
+            return False
+
+        torch.compiler.is_compiling = _is_compiling_stub
+except Exception:
+    pass  # 如果 torch 未安装，稍后会报错
+
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 from typing import Dict, Optional
@@ -42,10 +57,10 @@ class MainWindow:
 
     # 类常量
     VIDEO_RATIO = 16 / 9  # 视频显示比例
-    SCREEN_RATIO = 0.75  # 窗口占屏幕比例
-    VIDEO_CANVAS_WIDTH = 880  # 固定视频画布宽度（加大）
-    VIDEO_CANVAS_HEIGHT = 495  # 固定视频画布高度（16:9）
-    ALERT_PANEL_WIDTH = 220  # 警报面板宽度（加宽）
+    SCREEN_RATIO = 1  # 窗口占屏幕比例
+    VIDEO_CANVAS_WIDTH = 1200  # 固定视频画布宽度（加大）
+    VIDEO_CANVAS_HEIGHT = 720  # 固定视频画布高度（16:9）
+    ALERT_PANEL_WIDTH = 360  # 警报面板宽度（加宽）
 
     def __init__(self) -> None:
         """初始化主窗口"""
@@ -104,10 +119,7 @@ class MainWindow:
                 "scene_type": "摔倒",
                 "selected_scenes": ["摔倒"],
                 "light_condition": "normal",
-                "enable_roi": False,
-                "enable_sound": True,
                 "enable_email": False,
-                "auto_record": False,
             },
             "scene_types": ["摔倒", "起火", "正常"],
         }
@@ -153,19 +165,26 @@ class MainWindow:
         self.root.after_idle(self._ensure_initial_geometry)
 
     def _setup_fonts(self) -> None:
-        """配置字体和样式"""
-        # 强制使用微软雅黑，全部加粗
-        self.font_family = "Microsoft YaHei"
-
-        # 定义不同用途的字体
+        """配置字体和样式 - 硬编码字体设置"""
+        # 字体设置（用户需手动安装字体，见 doc_asset/font/）
+        # 标题使用华文中宋，其余使用微软雅黑
+        self.font_family = "微软雅黑"  # 主字体
+        self.title_font_family = "华文中宋"  # 标题字体
+        
+        # 标题颜色
+        self.title_color = "#2c3e50"
+        
+        # 定义字体配置
         self.fonts = {
             "normal": (self.font_family, 12, "bold"),
             "title": (self.font_family, 16, "bold"),
             "large": (self.font_family, 18, "bold"),
             "small": (self.font_family, 11, "bold"),
-            "header": ("Georgia", 22, "bold italic"),
+            "header": (self.title_font_family, 22, "bold"),  # 主标题用华文中宋
             "replay": (self.font_family, 24, "bold"),
         }
+        
+        print(f"✓ 字体配置已加载 (主字体: {self.font_family}, 标题字体: {self.title_font_family})")
 
         # 配置ttk样式
         style = ttk.Style()
@@ -273,12 +292,12 @@ class MainWindow:
             )
             placeholder.place(relx=0.5, rely=0.5, anchor="center")
 
-        # 艺术标题（中间）- 直接使用 ttk.Label，无边框
+        # 艺术标题（中间）- 使用配置文件中的字体和颜色
         self.title_label = ttk.Label(
             header_frame,
             text="DLC：支持语义客制化的智能养老摄像头",
             font=self.fonts["header"],
-            foreground="#2c3e50",
+            foreground=self.title_color,  # 从配置文件读取颜色
         )
         self.title_label.grid(row=0, column=1, sticky="w")
 
@@ -406,7 +425,7 @@ class MainWindow:
         speed_combo = ttk.Combobox(
             progress_frame,
             textvariable=self.speed_var,
-            values=["0.25", "0.5", "1.0", "1.5", "2.0", "3.0"],
+            values=["0.25", "0.5", "1.0", "1.5", "2.0"],
             state="readonly",
             width=6,
         )
@@ -632,7 +651,6 @@ class MainWindow:
                 ("视频文件", "*.mp4 *.avi *.mkv *.mov *.wmv *.flv *.webm"),
                 ("MP4文件", "*.mp4"),
                 ("AVI文件", "*.avi"),
-                ("所有文件", "*.*"),
             ],
         )
 
@@ -780,9 +798,11 @@ class MainWindow:
             print(f"⚠️  设置窗口图标加载失败: {e}")
 
         self.settings_panel = SettingsPanel(self.settings_window, self.app_config)
-        
+
         # 注册场景变化回调（用于检测器热重载）
-        self.settings_panel.set_scenarios_changed_callback(self._reload_detector_scenarios)
+        self.settings_panel.set_scenarios_changed_callback(
+            self._reload_detector_scenarios
+        )
 
         # 启动场景变化监听器
         if self.config_updater:
@@ -1129,27 +1149,27 @@ class MainWindow:
                 config_updater = self.settings_panel.get_config_updater()
                 if config_updater is None:
                     config_updater = self.config_updater
-                
+
                 # 增量更新配置文件（只修改 enabled 字段）
                 if config_updater:
                     config_updater.update_scenarios(
                         all_scenes=all_scenes, selected_scenes=sorted(new_scenes)
                     )
-                
+
                 # 通知检测器重新加载场景配置（热重载）
                 self._reload_detector_scenarios()
 
     def _reload_detector_scenarios(self) -> None:
         """
         通知检测器热重载场景配置
-        
+
         当用户通过 GUI 修改场景配置后，检测器需要重新加载
         以反映最新的场景定义和阈值设置
         """
-        if hasattr(self, 'detector') and self.detector is not None:
+        if hasattr(self, "detector") and self.detector is not None:
             try:
                 # 调用检测器的热重载方法
-                if hasattr(self.detector, 'reload_scenarios'):
+                if hasattr(self.detector, "reload_scenarios"):
                     success = self.detector.reload_scenarios()
                     if success:
                         print("✅ 检测器场景配置已热重载")

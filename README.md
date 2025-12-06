@@ -67,9 +67,29 @@ conda activate dlc
 # 安装依赖
 pip install -r requirements.txt
 
-# Linux 用户安装中文字体（GUI 显示需要）
-sudo apt-get install -y fonts-noto-cjk fonts-wqy-zenhei
-```
+#Windows 用户安装中文字体（GUI 显示需要）
+#创建用户字体目录（如果不存在）
+mkdir "%LOCALAPPDATA%\Microsoft\Windows\Fonts" 2>nul
+#复制字体到用户目录
+copy "doc_asset\font\华文中宋.ttf" "%LOCALAPPDATA%\Microsoft\Windows\Fonts\"
+copy "doc_asset\font\微软雅黑.ttf" "%LOCALAPPDATA%\Microsoft\Windows\Fonts\"
+
+#macOS 用户安装中文字体（GUI 显示需要）
+# 复制到用户字体目录（无需 sudo）
+cp doc_asset/font/华文中宋.ttf ~/Library/Fonts/
+cp doc_asset/font/微软雅黑.ttf ~/Library/Fonts/
+# 或复制到系统字体目录（需 sudo）
+sudo cp doc_asset/font/*.ttf /Library/Fonts/
+
+#Linux 用户安装中文字体（GUI 显示需要）
+# 创建用户字体目录并复制字体
+mkdir -p ~/.local/share/fonts
+cp doc_asset/font/华文中宋.ttf ~/.local/share/fonts/
+cp doc_asset/font/微软雅黑.ttf ~/.local/share/fonts/
+# 刷新字体缓存
+fc-cache -fv
+
+#若安装字体后仍有问题，可能需要重启
 
 ### 运行
 
@@ -95,44 +115,50 @@ python main.py --config-name=config_fgclip mode=camera
 
 ```
 DLC-Detector-with-Language-Customization/
-├── main.py                     # 程序入口
-├── requirements.txt            # 依赖列表
+├── main.py                       # 程序入口
+├── requirements.txt              # 依赖列表
 │
-├── config/                     # Hydra 配置文件
-│   ├── config.yaml             # CLIP 模型主配置
-│   ├── config_fgclip.yaml      # FG-CLIP 2 模型主配置
-│   ├── camera/                 # 摄像头配置
-│   ├── model/                  # 模型参数配置
-│   ├── detection/              # 检测场景配置
-│   │   ├── default.yaml        # 默认场景（跌倒/火灾）
-│   │   ├── elderly_care.yaml   # 养老场景扩展
-│   │   └── minimal.yaml        # 精简场景
-│   └── alert/                  # 警报配置
+├── config/                       # Hydra 配置文件
+│   ├── config.yaml               # CLIP 模型主配置
+│   ├── config_fgclip.yaml        # FG-CLIP 2 模型主配置
+│   ├── gui_fonts.yaml            # GUI 字体配置（跨平台）
+│   ├── camera/                   # 摄像头配置
+│   ├── model/                    # 模型参数配置
+│   ├── detection/                # 检测场景配置
+│   │   ├── default.yaml          # 默认场景（跌倒/火灾）
+│   │   ├── elderly_care.yaml     # 养老场景扩展
+│   │   └── minimal.yaml          # 精简场景
+│   └── alert/                    # 警报配置
 │
-├── src/                        # 核心源码
-│   ├── core/                   # 核心模块
-│   │   ├── clip_detector.py    # 场景检测器
-│   │   ├── video_stream.py     # 视频流处理
-│   │   └── alert_manager.py    # 警报管理
-│   ├── models/                 # 模型封装
-│   │   ├── clip_wrapper.py     # CLIP 模型封装
-│   │   └── fgclip_wrapper.py   # FG-CLIP 2 封装
-│   └── utils/                  # 工具模块
-│       ├── translator.py       # 中文翻译器
-│       ├── config_loader.py    # 配置加载
-│       ├── config_updater.py   # 配置更新器
-│       └── logger.py           # 日志工具
+├── src/                          # 核心源码
+│   ├── core/                     # 核心模块
+│   │   ├── clip_detector.py      # 场景检测器
+│   │   ├── video_stream.py       # 视频流处理
+│   │   └── alert_manager.py      # 警报管理
+│   ├── models/                   # 模型封装
+│   │   ├── clip_wrapper.py       # CLIP 模型封装
+│   │   └── fgclip_wrapper.py     # FG-CLIP 2 封装
+│   └── utils/                    # 工具模块
+│       ├── translator.py         # 中文翻译器
+│       ├── config_loader.py      # 配置加载
+│       ├── config_updater.py     # 配置更新器
+│       ├── font_loader.py        # GUI 字体加载器
+│       └── logger.py             # 日志工具
 │
-├── gui/                        # GUI 模块
-│   ├── main_window.py          # 主窗口
-│   └── settings_panel.py       # 设置面板
+├── gui/                          # GUI 模块
+│   ├── main_window.py            # 主窗口
+│   └── settings_panel.py         # 设置面板
 │
-├── assets/                     # 资源文件
-│   └── test_videos/            # 测试视频
+├── scripts/                      # 脚本工具
+│   ├── download_models.py        # 模型下载脚本
+│   └── run_demo.py               # 演示脚本
 │
-└── docs/                       # 文档
-    ├── FG_CLIP_GUIDE.md        # FG-CLIP 使用指南
-    └── PROMPT_OPTIMIZATION.md  # Prompt 优化指南
+├── assets/                       # 资源文件
+│   └── test_videos/              # 测试视频
+│
+└── docs/                         # 文档
+    ├── FG_CLIP_GUIDE.md          # FG-CLIP 使用指南
+    └── PROMPT_OPTIMIZATION.md    # Prompt 优化指南
 ```
 
 ## 配置说明
@@ -144,15 +170,15 @@ DLC-Detector-with-Language-Customization/
 ```yaml
 # config/detection/default.yaml
 scenarios:
-  fall:                                    # 场景 ID（英文键名）
-    enabled: true                          # 是否启用
-    name: 跌倒检测                          # 显示名称
+  fall:                                         # 场景 ID（英文键名）
+    enabled: true                               # 是否启用
+    name: 跌倒检测                               # 显示名称
     prompt: a person has fallen and is lying on the floor  # 检测 Prompt
-    prompt_cn: 有人摔倒躺在地上              # 中文描述
-    threshold: 0.375                       # 检测阈值（动态计算）
-    cooldown: 30                           # 冷却时间（秒）
-    consecutive_frames: 2                  # 连续帧要求
-    alert_level: high                      # 警报级别 (high/medium/low)
+    prompt_cn: 有人摔倒躺在地上                  # 中文描述
+    threshold: 0.375                            # 检测阈值（动态计算）
+    cooldown: 30                                # 冷却时间（秒）
+    consecutive_frames: 2                       # 连续帧要求
+    alert_level: high                           # 警报级别 (high/medium/low)
   
   fire:
     enabled: true
@@ -164,15 +190,15 @@ scenarios:
     consecutive_frames: 3
     alert_level: high
   
-  normal:                                  # 正常场景（内置保护，不可删除）
-    enabled: true
+  normal:                                       # 正常场景（内置保护，不可删除）
+    enabled: true 
     name: 正常场景
     prompt: an ordinary indoor room with no emergency
     prompt_cn: 普通室内环境，无异常
-    threshold: 0.99                        # 高阈值，避免误报
+    threshold: 0.99                             # 高阈值，避免误报
     cooldown: 10
     consecutive_frames: 1
-    alert_level: low                       # 强制为 low，不触发警报
+    alert_level: low                            # 强制为 low，不触发警报
 ```
 
 > 💡 **提示**：通过 GUI 设置面板可以可视化地启用/禁用场景，配置会自动增量更新。
@@ -272,14 +298,31 @@ class YourModelWrapper:
 <details>
 <summary><b>Q: GUI 中文显示为方框？</b></summary>
 
-安装中文字体：
+Linux 用户需安装中文字体：
 ```bash
-# Ubuntu/Debian，当前对于Ubuntu系统支持性较差，请谨慎使用
-sudo apt-get install fonts-noto-cjk fonts-wqy-zenhei
-
-# 刷新字体缓存
-fc-cache -fv
+# Ubuntu/Debian
+sudo apt-get install -y fonts-noto-cjk fonts-wqy-zenhei && fc-cache -fv
 ```
+
+Windows/macOS 通常自带中文字体，无需安装。
+</details>
+
+<details>
+<summary><b>Q: 如何自定义字体配置？</b></summary>
+
+编辑 `config/gui_fonts.yaml` 文件：
+```yaml
+# 修改字体大小
+font_styles:
+  normal:
+    size: 14  # 增大默认字体
+    weight: "bold"
+
+# 修改标题颜色
+title_color: "#1a5276"  # 深蓝色
+```
+
+重启程序后生效。
 </details>
 
 <details>

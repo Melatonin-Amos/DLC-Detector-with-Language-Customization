@@ -32,6 +32,21 @@ import shutil
 # 添加项目根目录到Python路径
 sys.path.insert(0, str(Path(__file__).parent))
 
+# 修复 torch.compiler.is_compiling 兼容性问题
+# PyTorch 2.2.x 没有 is_compiling 函数，但 transformers 4.57+ 需要它
+try:
+    import torch
+
+    if hasattr(torch, "compiler") and not hasattr(torch.compiler, "is_compiling"):
+
+        def _is_compiling_stub():
+            """返回 False 的存根函数，用于兼容旧版本 PyTorch"""
+            return False
+
+        torch.compiler.is_compiling = _is_compiling_stub
+except Exception:
+    pass  # 如果 torch 未安装，稍后会报错
+
 from src.core.video_stream import VideoStream
 from src.core.clip_detector import CLIPDetector
 from src.core.alert_manager import AlertManager

@@ -7,7 +7,7 @@ scenarios:
     name: 跌倒检测
     prompt: a person has fallen and is lying on the floor
     prompt_cn: 有人摔倒躺在地上
-    threshold: 0.4
+    threshold: 0.5
     cooldown: 30
     consecutive_frames: 2
     alert_level: high
@@ -16,7 +16,7 @@ scenarios:
     name: 火灾检测
     prompt: flames and fire burning with visible smoke
     prompt_cn: 发生火灾，有火焰和浓烟
-    threshold: 0.375
+    threshold: 0.5
     cooldown: 60
     consecutive_frames: 3
     alert_level: high
