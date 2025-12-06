@@ -232,7 +232,7 @@ class SettingsPanel:
 
     def _setup_fonts(self) -> None:
         """配置字体和样式 - 硬编码字体设置"""
-        # 字体设置（用户需手动安装字体，见 doc_asset/font/）
+        # 字体设置（用户需手动安装字体，见 asset/font/）
         # 全部使用微软雅黑（设置面板不需要华文中宋）
         self.font_family = "微软雅黑"
         

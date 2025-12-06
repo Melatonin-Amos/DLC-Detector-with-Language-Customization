@@ -166,7 +166,7 @@ class MainWindow:
 
     def _setup_fonts(self) -> None:
         """配置字体和样式 - 硬编码字体设置"""
-        # 字体设置（用户需手动安装字体，见 doc_asset/font/）
+        # 字体设置（用户需手动安装字体，见 asset/font/）
         # 标题使用华文中宋，其余使用微软雅黑
         self.font_family = "微软雅黑"  # 主字体
         self.title_font_family = "华文中宋"  # 标题字体

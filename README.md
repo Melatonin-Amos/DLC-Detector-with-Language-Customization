@@ -1,7 +1,7 @@
 # DLC-Detector-with-Language-Customization
 
 <p align="center">
-  <img src="doc_asset/image/DLCupd.png" alt="DLC全栈技术流程图" width="800"/>
+  <img src="asset/image/DLCupd.png" alt="DLC全栈技术流程图" width="800"/>
 </p>
 
 <p align="center">
@@ -16,6 +16,8 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.10+-blue.svg" alt="Python"/>
   <img src="https://img.shields.io/badge/PyTorch-1.12+-orange.svg" alt="PyTorch"/>
+  <img src="https://img.shields.io/badge/CLIP-OpenAI-brightgreen.svg" alt="CLIP"/>
+  <img src="https://img.shields.io/badge/FG--CLIP-2.0-yellow.svg" alt="FG-CLIP"/>
   <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License"/>
 </p>
 
@@ -40,9 +42,9 @@
 - 📹 **多输入源**：支持摄像头实时流和本地视频文件
 
 <p align="center">
-  <img src="doc_asset/image/framework.png" alt="FG-CLIP2 架构图" width="700"/>
+  <img src="asset/image/framework.png" alt="FG-CLIP2 架构图" width="700"/>
   <br/>
-  <em>FG-CLIP 2 模型架构（推荐在算力充足时使用）</em>
+  <em>FG-CLIP 2 预训练架构（推荐在算力充足时使用）</em>
 </p>
 
 ## 快速开始
@@ -71,44 +73,37 @@ pip install -r requirements.txt
 #创建用户字体目录（如果不存在）
 mkdir "%LOCALAPPDATA%\Microsoft\Windows\Fonts" 2>nul
 #复制字体到用户目录
-copy "doc_asset\font\华文中宋.ttf" "%LOCALAPPDATA%\Microsoft\Windows\Fonts\"
-copy "doc_asset\font\微软雅黑.ttf" "%LOCALAPPDATA%\Microsoft\Windows\Fonts\"
+copy "asset\font\华文中宋.ttf" "%LOCALAPPDATA%\Microsoft\Windows\Fonts\"
+copy "asset\font\微软雅黑.ttf" "%LOCALAPPDATA%\Microsoft\Windows\Fonts\"
 
 #macOS 用户安装中文字体（GUI 显示需要）
 # 复制到用户字体目录（无需 sudo）
-cp doc_asset/font/华文中宋.ttf ~/Library/Fonts/
-cp doc_asset/font/微软雅黑.ttf ~/Library/Fonts/
+cp asset/font/华文中宋.ttf ~/Library/Fonts/
+cp asset/font/微软雅黑.ttf ~/Library/Fonts/
 # 或复制到系统字体目录（需 sudo）
-sudo cp doc_asset/font/*.ttf /Library/Fonts/
+sudo cp asset/font/*.ttf /Library/Fonts/
 
-#Linux 用户安装中文字体（GUI 显示需要）
-# 创建用户字体目录并复制字体
-mkdir -p ~/.local/share/fonts
-cp doc_asset/font/华文中宋.ttf ~/.local/share/fonts/
-cp doc_asset/font/微软雅黑.ttf ~/.local/share/fonts/
-# 刷新字体缓存
-fc-cache -fv
+#Linux 用户安装中文字体(GUI 显示需要)
+# 方法1: 复制到用户字体目录(推荐)
+mkdir -p ~/.local/share/fonts && cp asset/font/*.ttf ~/.local/share/fonts/ && fc-cache -fv
+
+# 方法2: 或安装系统字体包
+sudo apt-get install -y fonts-noto-cjk fonts-wqy-zenhei && fc-cache -fv
 
 #若安装字体后仍有问题，可能需要重启
 
-### 运行
+### 快速运行
 
 ```bash
-# 使用 FG-CLIP 2 模型，首次运行会下载模型文件（约1.6GB），后续运行即可直接开始检测
+# 推荐: 使用 FG-CLIP 2 模型(更高精度,支持中文)
+# 首次运行会自动下载模型(约1.6GB),请耐心等待
 python main.py --config-name=config_fgclip mode=camera camera.index=0
 
+# 或使用原始 CLIP 模型(更快速度,需要英文 prompt)
+python main.py --config-name=config mode=camera camera.index=0
+
 # 使用视频文件测试
-python main.py --config-name=config_fgclip mode=video video_path=assets/test_videos/fire_detection/fire3.mp4
-
-# 启用 AI 场景生成（可选，用于自定义场景）
-export GEMINI_API_KEY="your_api_key"  # 推荐使用 Gemini
-# 或 export DEEPSEEK_API_KEY="your_api_key"
-
-# 对于Windows系统，可能需要使用不同的语法：
-set GEMINI_API_KEY=your_api_key
-# 或 set DEEPSEEK_API_KEY=your_api_key
-
-python main.py --config-name=config_fgclip mode=camera
+python main.py --config-name=config_fgclip mode=video video_path=<your_vedio_path>
 ```
 
 ## 项目结构
@@ -121,14 +116,18 @@ DLC-Detector-with-Language-Customization/
 ├── config/                       # Hydra 配置文件
 │   ├── config.yaml               # CLIP 模型主配置
 │   ├── config_fgclip.yaml        # FG-CLIP 2 模型主配置
-│   ├── gui_fonts.yaml            # GUI 字体配置（跨平台）
 │   ├── camera/                   # 摄像头配置
+│   │   └── default.yaml
 │   ├── model/                    # 模型参数配置
+│   │   ├── vit_b_32.yaml         # CLIP ViT-B/32 配置
+│   │   └── fgclip2.yaml          # FG-CLIP 2 配置
 │   ├── detection/                # 检测场景配置
-│   │   ├── default.yaml          # 默认场景（跌倒/火灾）
+│   │   ├── default.yaml          # 默认场景(跌倒/火灾)
+│   │   ├── default.yaml.template # 场景模板
 │   │   ├── elderly_care.yaml     # 养老场景扩展
 │   │   └── minimal.yaml          # 精简场景
 │   └── alert/                    # 警报配置
+│       └── default.yaml
 │
 ├── src/                          # 核心源码
 │   ├── core/                     # 核心模块
@@ -149,12 +148,6 @@ DLC-Detector-with-Language-Customization/
 │   ├── main_window.py            # 主窗口
 │   └── settings_panel.py         # 设置面板
 │
-├── scripts/                      # 脚本工具
-│   ├── download_models.py        # 模型下载脚本
-│   └── run_demo.py               # 演示脚本
-│
-├── assets/                       # 资源文件
-│   └── test_videos/              # 测试视频
 │
 └── docs/                         # 文档
     ├── FG_CLIP_GUIDE.md          # FG-CLIP 使用指南
@@ -175,8 +168,8 @@ scenarios:
     name: 跌倒检测                               # 显示名称
     prompt: a person has fallen and is lying on the floor  # 检测 Prompt
     prompt_cn: 有人摔倒躺在地上                  # 中文描述
-    threshold: 0.375                            # 检测阈值（动态计算）
-    cooldown: 30                                # 冷却时间（秒）
+    threshold: 0.5                              # 检测阈值(0-1之间)
+    cooldown: 30                                # 冷却时间(秒)
     consecutive_frames: 2                       # 连续帧要求
     alert_level: high                           # 警报级别 (high/medium/low)
   
@@ -184,8 +177,8 @@ scenarios:
     enabled: true
     name: 火灾检测
     prompt: flames and fire burning with visible smoke
-    prompt_cn: 发生火灾，有火焰和浓烟
-    threshold: 0.375
+    prompt_cn: 发生火灾,有火焰和浓烟
+    threshold: 0.5
     cooldown: 60
     consecutive_frames: 3
     alert_level: high
@@ -308,24 +301,6 @@ Windows/macOS 通常自带中文字体，无需安装。
 </details>
 
 <details>
-<summary><b>Q: 如何自定义字体配置？</b></summary>
-
-编辑 `config/gui_fonts.yaml` 文件：
-```yaml
-# 修改字体大小
-font_styles:
-  normal:
-    size: 14  # 增大默认字体
-    weight: "bold"
-
-# 修改标题颜色
-title_color: "#1a5276"  # 深蓝色
-```
-
-重启程序后生效。
-</details>
-
-<details>
 <summary><b>Q: 摄像头无法打开？</b></summary>
 
 尝试不同的摄像头索引：
@@ -337,23 +312,41 @@ python main.py mode=camera camera.index=0  # 或 1, 2
 <details>
 <summary><b>Q: 显存不足？</b></summary>
 
-使用精简配置或降低分辨率：
+使用精简配置，使用更小的CLIP模型，或降低分辨率：
 ```bash
-python main.py --config-name=config_fgclip detection=minimal camera.width=640 camera.height=480
+python main.py --config-name=config detection=minimal camera.width=640 camera.height=480
 ```
 </details>
 
 <details>
-<summary><b>Q: 如何使用 AI 生成自定义场景？</b></summary>
+<summary><b>Q: 如何使用 AI 生成自定义场景?</b></summary>
 
-1. 设置 API 密钥环境变量：
+使用 AI 生成场景需要配置 API 密钥:
+
+1. 获取 API 密钥:
+   - [Google Gemini](https://ai.google.dev/) (推荐,免费配额较高)
+   - [DeepSeek](https://www.deepseek.com/) (备选)
+
+2. 设置环境变量:
 ```bash
-export GEMINI_API_KEY="your_key"  # 优先使用
+# Linux/macOS
+export GEMINI_API_KEY="your_gemini_api_key"
 # 或
-export DEEPSEEK_API_KEY="your_key"
+export DEEPSEEK_API_KEY="your_deepseek_api_key"
+
+# Windows (PowerShell)
+$env:GEMINI_API_KEY="your_gemini_api_key"
+# 或
+$env:DEEPSEEK_API_KEY="your_deepseek_api_key"
 ```
-2. 在 GUI 设置面板点击「新建场景」
-3. 输入场景名称（如"打架检测"），AI 将自动生成配置
+
+3. 在 GUI 中使用:
+   - 打开设置面板
+   - 点击「新建场景」按钮
+   - 输入场景描述(如"检测打架行为")
+   - AI 将自动生成 prompt、阈值等配置
+
+注意: AI 生成功能仅用于辅助创建场景配置,基础检测功能无需 API 密钥。
 </details>
 
 <details>
@@ -372,7 +365,7 @@ export DEEPSEEK_API_KEY="your_key"
 
 欢迎提交 Issue 和 Pull Request！我们特别鼓励您进行下面的增量式更新并且提交PR：
 
-  - 隐私保护：在边缘设备+服务器的计算情境，如何保持摄像头视觉信息可能携带的用户隐私的安全性？您可以尝试使用稀疏视觉输入。
+  - 隐私保护：在边缘设备+服务器的计算情境，如何保持摄像头视觉信息可能携带的用户隐私的安全性？您可以尝试使用稀疏视觉输入
   - 更加开盒即用：可以简化当前的运行逻辑，把更多自由度交给GUI
   - 跨终端GUI与应用：可以开发针对Linux、安卓、iOS的GUI和通讯、计算机制
 
