@@ -96,6 +96,17 @@ sudo apt-get install -y fonts-noto-cjk fonts-wqy-zenhei && fc-cache -fv
 ### 快速运行
 
 ```bash
+# 设置API
+# Linux/macOS
+export GEMINI_API_KEY="your_gemini_api_key"
+# 或
+export DEEPSEEK_API_KEY="your_deepseek_api_key"
+
+# Windows (PowerShell)
+$env:GEMINI_API_KEY="your_gemini_api_key"
+# 或
+$env:DEEPSEEK_API_KEY="your_deepseek_api_key"
+
 # 推荐: 使用 FG-CLIP 2 模型(更高精度,支持中文)
 # 首次运行会自动下载模型(约1.6GB),请耐心等待
 python main.py --config-name=config_fgclip mode=camera camera.index=0
@@ -213,7 +224,7 @@ python main.py --config-name=config_fgclip detection=minimal mode=camera
 
 ```yaml
 email:
-  enabled: true                        # 启用邮件警报
+  enabled: true                        # 启用邮件警报，默认为false
   smtp_server: "smtp.qq.com"           # SMTP服务器
   smtp_port: 465                       # SSL端口
   sender_email: "your@qq.com"          # 发件邮箱
@@ -241,19 +252,6 @@ email:
    - 内置场景（跌倒、火灾、正常）不可删除
 
 ## 开发指南
-
-### 开发环境设置
-
-```bash
-# 安装开发依赖
-pip install -r requirements.txt
-
-# 代码格式化
-black src/ gui/ tests/
-
-# 代码检查
-flake8 src/ gui/
-```
 
 ### 添加新检测场景
 
@@ -285,7 +283,6 @@ class YourModelWrapper:
 - 使用 [Black](https://github.com/psf/black) 格式化代码
 - 遵循 [PEP 8](https://pep8.org/) 风格指南
 - 函数和类需添加 docstring
-- 提交前运行 `pytest` 确保测试通过
 
 ## 常见问题
 
@@ -294,7 +291,7 @@ class YourModelWrapper:
 
 Linux 用户需安装中文字体：
 ```bash
-# Ubuntu/Debian
+# Ubuntu/Debian（支持或仍暂不完善）
 sudo apt-get install -y fonts-noto-cjk fonts-wqy-zenhei && fc-cache -fv
 ```
 
@@ -360,9 +357,13 @@ $env:DEEPSEEK_API_KEY="your_deepseek_api_key"
 
 ## 贡献者
 
-本项目由上海交通大学 2025 级本科生团队开发：
+本项目由上海交通大学 2025 级本科生团队开发，开发团队成员：
 
-- 开发团队成员
+<div align="center">
+  <a href="https://github.com/Melatonin-Amos/DLC-Detector-with-Language-Customization/graphs/contributors">
+    <img src="https://contrib.rocks/image?repo=Melatonin-Amos/DLC-Detector-with-Language-Customization" />
+  </a>
+</div>
 
 欢迎提交 Issue 和 Pull Request！我们特别鼓励您进行下面的增量式更新并且提交PR：
 
