@@ -92,7 +92,7 @@ class SettingsPanel:
         # 初始化 ConfigUpdater（复用实例，避免重复创建）
         self._config_updater: Optional[ConfigUpdater] = None
         self._init_config_updater()
-        
+
         # 场景变化回调（用于通知外部组件，如检测器热重载）
         self._on_scenarios_changed_callback: Optional[Callable] = None
 
@@ -157,7 +157,7 @@ class SettingsPanel:
     def get_config_updater(self) -> Optional[ConfigUpdater]:
         """
         获取配置更新器实例（安全访问）
-        
+
         Returns:
             ConfigUpdater 实例，若不可用则返回 None
         """
@@ -166,10 +166,10 @@ class SettingsPanel:
     def set_scenarios_changed_callback(self, callback: Callable) -> None:
         """
         设置场景变化回调函数
-        
+
         当场景配置发生变化时（新增、删除、启用/禁用），
         会调用此回调通知外部组件（如检测器）进行热重载。
-        
+
         Args:
             callback: 回调函数，无参数
         """
@@ -210,7 +210,7 @@ class SettingsPanel:
             scenarios = config["scenarios"]
             scene_types = []
             enabled_scenes = []
-            
+
             for scenario in scenarios.values():
                 name = scenario.get("name")
                 if name:
@@ -235,7 +235,7 @@ class SettingsPanel:
         # 字体设置（用户需手动安装字体，见 asset/font/）
         # 全部使用微软雅黑（设置面板不需要华文中宋）
         self.font_family = "微软雅黑"
-        
+
         # 定义字体配置
         self.fonts = {
             "normal": (self.font_family, 12, "bold"),
@@ -577,7 +577,14 @@ class SettingsPanel:
             value=self.app_config.get("scene", {}).get("enable_sound", True)
         )
         ttk.Checkbutton(
-            alarm_frame, text="声音报警", variable=self.enable_sound_var
+            alarm_frame,
+            text="高亮报警",
+            variable=self.enable_sound_var,
+            command=lambda: (
+                self.enable_sound_var.set(True)
+                if not self.enable_sound_var.get()
+                else None
+            ),
         ).pack(side=tk.LEFT, padx=(10, 20))
 
         self.enable_email_var = tk.BooleanVar(
@@ -696,25 +703,26 @@ class SettingsPanel:
         # 创建滚动容器
         canvas = tk.Canvas(dialog, highlightthickness=0)
         scrollbar = ttk.Scrollbar(dialog, orient="vertical", command=canvas.yview)
-        
+
         # 创建输入框架
         input_frame = ttk.Frame(canvas, padding=(40, 20))
-        
+
         # 配置滚动
         def on_frame_configure(event):
             canvas.configure(scrollregion=canvas.bbox("all"))
-        
+
         input_frame.bind("<Configure>", on_frame_configure)
         canvas.create_window((0, 0), window=input_frame, anchor="nw")
         canvas.configure(yscrollcommand=scrollbar.set)
-        
+
         # 布局滚动条和画布
         canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        
+
         # 鼠标滚轮绑定
         def on_mousewheel(event):
             canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
         canvas.bind_all("<MouseWheel>", on_mousewheel)
 
         # 说明标签
@@ -760,12 +768,12 @@ class SettingsPanel:
             button_frame, text="✕ 取消", width=12, style="Action.TButton"
         )
         cancel_btn.pack(side=tk.LEFT, padx=15)
-        
+
         # 窗口关闭时解绑鼠标滚轮
         def on_dialog_close():
             canvas.unbind_all("<MouseWheel>")
             dialog.destroy()
-        
+
         dialog.protocol("WM_DELETE_WINDOW", on_dialog_close)
 
         def on_timeout():
@@ -813,7 +821,7 @@ class SettingsPanel:
             confirm_btn.config(state=tk.DISABLED)
             cancel_btn.config(state=tk.DISABLED)
             name_entry.config(state=tk.DISABLED)
-            
+
             # 根据 AI 可用性显示不同提示
             if self._config_updater.is_ai_available():
                 status_label.config(text="🤖 AI正在生成场景配置，请稍候...")
@@ -859,7 +867,7 @@ class SettingsPanel:
 
                     # 确保enabled为True（新创建的场景默认启用）
                     scene_config["enabled"] = True
-                    
+
                     # 获取场景显示名称
                     display_name = scene_config.get("name", scene_name)
 
@@ -869,7 +877,9 @@ class SettingsPanel:
                     # 回到主线程更新UI
                     dialog.after(
                         0,
-                        lambda: on_generation_complete(success, display_name, scene_key),
+                        lambda: on_generation_complete(
+                            success, display_name, scene_key
+                        ),
                     )
 
                 except Exception as e:
@@ -894,7 +904,7 @@ class SettingsPanel:
 
                     # 通知场景变化（触发配置更新）
                     self._on_scene_checkbox_change()
-                    
+
                     # 通知外部组件（如检测器）进行热重载
                     self._notify_scenarios_changed()
 
@@ -974,11 +984,13 @@ class SettingsPanel:
                     "配置更新器不可用，请检查配置文件是否存在",
                 )
                 return
-            
+
             # 从配置文件中删除场景
             try:
                 # 复用已初始化的 config_updater
-                success = self._config_updater.delete_scenarios_by_names(selected_scenes)
+                success = self._config_updater.delete_scenarios_by_names(
+                    selected_scenes
+                )
 
                 if not success:
                     messagebox.showerror(
@@ -1011,10 +1023,10 @@ class SettingsPanel:
 
             # 重新创建复选框
             self._create_scene_checkboxes()
-            
+
             # 触发场景变化回调（通知配置更新）
             self._on_scene_checkbox_change()
-            
+
             # 通知外部组件（如检测器）进行热重载
             self._notify_scenarios_changed()
 
@@ -1109,7 +1121,7 @@ class SettingsPanel:
             {
                 "scene_type": str,              # 第一个选中的场景（向后兼容）
                 "selected_scenes": list[str],   # 所有选中的场景列表（新增）
-                "enable_sound": bool,           # 是否启用声音报警
+                "enable_highlight": bool,           # 是否启用高亮报警
                 "enable_email": bool,           # 是否启用短信通知
             }
 
@@ -1140,7 +1152,7 @@ class SettingsPanel:
 
         Dictionary Structure:
             {
-                "sound": bool,    # 是否启用声音报警
+                "highlight": bool,    # 是否启用高亮报警
                 "email": bool,    # 是否启用邮件通知
             }
 
@@ -1326,7 +1338,7 @@ class SettingsPanel:
                 "detection_interval": float,     # 检测间隔
                 "camera_id": int,               # 摄像头ID
                 "alert_delay": float,           # 告警延迟
-                "enable_sound": bool,           # 是否启用声音报警
+                "enable_highlight": bool,           # 是否启用高亮报警
                 "enable_email": bool,           # 是否启用邮件通知
             }
 
@@ -1430,7 +1442,7 @@ class SettingsPanel:
         # 检查选中场景列表变化
         old_scenes = set(old_config.get("selected_scenes", []))
         new_scenes = set(new_config.get("selected_scenes", []))
-        
+
         if old_scenes != new_scenes:
             added = new_scenes - old_scenes
             removed = old_scenes - new_scenes
