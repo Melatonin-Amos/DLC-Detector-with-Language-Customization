@@ -21,7 +21,7 @@ class ChineseTranslator:
     def __init__(
         self,
         api_key: Optional[str] = None,
-        model: str = "gemini-2.5-flash",
+        model: str = "gemini-3-flash-preview",
         cache_enabled: bool = True,
     ):
         """

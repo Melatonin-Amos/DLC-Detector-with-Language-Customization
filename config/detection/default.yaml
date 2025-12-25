@@ -3,25 +3,24 @@ show_results: true
 show_confidence: true
 scenarios:
   fall:
-    enabled: true
     name: 跌倒检测
     prompt: a person has fallen and is lying on the floor
     prompt_cn: 有人摔倒躺在地上
-    threshold: 0.5
+    threshold: 0.375
     cooldown: 30
     consecutive_frames: 2
     alert_level: high
-  fire:
     enabled: true
+  fire:
     name: 火灾检测
     prompt: flames and fire burning with visible smoke
     prompt_cn: 发生火灾，有火焰和浓烟
-    threshold: 0.5
+    threshold: 0.375
     cooldown: 60
     consecutive_frames: 3
     alert_level: high
-  normal:
     enabled: true
+  normal:
     name: 正常场景
     prompt: an ordinary indoor room with no emergency
     prompt_cn: 普通室内环境，无异常
@@ -29,3 +28,14 @@ scenarios:
     cooldown: 10
     consecutive_frames: 1
     alert_level: low
+    enabled: true
+  fight:
+    enabled: true
+    name: 打架检测
+    prompt: two or more people fighting, punching, kicking, or wrestling violently
+      in a physical confrontation
+    prompt_cn: 两人或多人打架，拳打脚踢或激烈扭打的身体冲突
+    threshold: 0.375
+    cooldown: 15
+    consecutive_frames: 2
+    alert_level: high

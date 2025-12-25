@@ -16,7 +16,7 @@ video_path: null  # 视频模式下的视频文件路径
 translation:
   enabled: false  # FG-CLIP原生支持中文，无需翻译
   api_key: null
-  model: gemini-2.5-flash
+  model: gemini-3-flash-preview
   cache_enabled: false
 
 # Hydra输出目录配置

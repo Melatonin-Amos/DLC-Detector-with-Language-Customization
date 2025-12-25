@@ -112,7 +112,7 @@ class DLCApplication:
                 logger.info("初始化中文翻译器...")
                 self.translator = ChineseTranslator(
                     api_key=api_key,
-                    model=translation_config.get("model", "gemini-1.5-flash"),
+                    model=translation_config.get("model", "gemini-3-flash-preview"),
                     cache_enabled=translation_config.get("cache_enabled", True),
                 )
             else:
