@@ -25,6 +25,7 @@ from typing import List, Dict, Any, Optional
 # Gemini API 支持（可选依赖）
 try:
     import google.generativeai as genai
+
     GEMINI_AVAILABLE = True
 except ImportError:
     GEMINI_AVAILABLE = False
@@ -32,6 +33,7 @@ except ImportError:
 # DeepSeek API 支持（可选依赖）
 try:
     from openai import OpenAI
+
     DEEPSEEK_AVAILABLE = True
 except ImportError:
     DEEPSEEK_AVAILABLE = False
@@ -45,9 +47,14 @@ if not GEMINI_AVAILABLE and not DEEPSEEK_AVAILABLE:
 # 内置场景保护列表（这些场景不能被删除）
 PROTECTED_SCENE_KEYS = {"fall", "fire", "normal"}
 PROTECTED_SCENE_NAMES = {
-    "摔倒", "跌倒", "跌倒检测",  # fall 的别名
-    "起火", "火灾", "火灾检测",  # fire 的别名
-    "正常", "正常场景",          # normal 的别名
+    "摔倒",
+    "跌倒",
+    "跌倒检测",  # fall 的别名
+    "起火",
+    "火灾",
+    "火灾检测",  # fire 的别名
+    "正常",
+    "正常场景",  # normal 的别名
 }
 
 
@@ -60,7 +67,7 @@ class ConfigUpdater:
 
     # API 超时时间（秒）
     API_TIMEOUT = 30
-    
+
     # 当前使用的 API 类型
     current_api: str = None  # "gemini", "deepseek", or None
 
@@ -75,6 +82,9 @@ class ConfigUpdater:
         self.project_root = Path(__file__).parent.parent.parent
         self.config_file = self.project_root / config_path
 
+        # 尝试加载 .env 文件
+        self._load_env_file()
+
         # 确保配置文件存在
         if not self.config_file.exists():
             raise FileNotFoundError(f"配置文件不存在: {self.config_file}")
@@ -86,32 +96,67 @@ class ConfigUpdater:
 
         print(f"✓ 配置更新器初始化: {self.config_file}")
 
+    def _load_env_file(self) -> None:
+        """手动加载 .env 文件（如果存在）"""
+        env_path = self.project_root / ".env"
+        if not env_path.exists():
+            return
+
+        try:
+            with open(env_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith("#"):
+                        continue
+
+                    if "=" in line:
+                        key, value = line.split("=", 1)
+                        key = key.strip()
+                        value = value.strip()
+
+                        # 去除引号
+                        if (value.startswith('"') and value.endswith('"')) or (
+                            value.startswith("'") and value.endswith("'")
+                        ):
+                            value = value[1:-1]
+
+                        if key and value:
+                            # 只有当环境变量不存在时才设置，避免覆盖系统环境变量
+                            if key not in os.environ:
+                                os.environ[key] = value
+
+            # 更新 API 密钥
+            self.GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+            self.DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
+
+        except Exception as e:
+            print(f"⚠️  加载 .env 文件失败: {e}")
+
     def _init_llm_client(self) -> None:
         """初始化 LLM 客户端（优先 Gemini，备选 DeepSeek）"""
         # 1. 优先尝试 Gemini
         if GEMINI_AVAILABLE and self.GEMINI_API_KEY:
             try:
                 genai.configure(api_key=self.GEMINI_API_KEY)
-                self.gemini_model = genai.GenerativeModel('gemini-2.0-flash')
+                self.gemini_model = genai.GenerativeModel("gemini-3-flash-preview")
                 self.current_api = "gemini"
                 print("✓ Gemini API 初始化成功（优先使用）")
                 return
             except Exception as e:
                 print(f"⚠️  Gemini API 初始化失败: {e}")
-        
+
         # 2. 回退到 DeepSeek
         if DEEPSEEK_AVAILABLE and self.DEEPSEEK_API_KEY:
             try:
                 self.ai_client = OpenAI(
-                    api_key=self.DEEPSEEK_API_KEY, 
-                    base_url="https://api.deepseek.com"
+                    api_key=self.DEEPSEEK_API_KEY, base_url="https://api.deepseek.com"
                 )
                 self.current_api = "deepseek"
                 print("✓ DeepSeek API 初始化成功（备选）")
                 return
             except Exception as e:
                 print(f"⚠️  DeepSeek API 初始化失败: {e}")
-        
+
         # 3. 无可用 API
         print("ℹ️  无可用 LLM API，将使用预定义模板生成配置")
         self.current_api = None
@@ -121,8 +166,7 @@ class ConfigUpdater:
         if DEEPSEEK_AVAILABLE and self.DEEPSEEK_API_KEY:
             try:
                 self.ai_client = OpenAI(
-                    api_key=self.DEEPSEEK_API_KEY, 
-                    base_url="https://api.deepseek.com"
+                    api_key=self.DEEPSEEK_API_KEY, base_url="https://api.deepseek.com"
                 )
                 self.current_api = "deepseek"
                 print("✓ DeepSeek API 初始化成功")
@@ -163,7 +207,10 @@ class ConfigUpdater:
         Returns:
             响应文本，超时或失败返回 None
         """
-        from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
+        from concurrent.futures import (
+            ThreadPoolExecutor,
+            TimeoutError as FutureTimeoutError,
+        )
 
         def call_api():
             try:
@@ -196,7 +243,10 @@ class ConfigUpdater:
         Returns:
             响应文本，超时或失败返回 None
         """
-        from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
+        from concurrent.futures import (
+            ThreadPoolExecutor,
+            TimeoutError as FutureTimeoutError,
+        )
 
         def call_api():
             try:
@@ -246,7 +296,7 @@ class ConfigUpdater:
     def is_ai_available(self) -> bool:
         """
         判断是否有可用的 AI API（Gemini 或 DeepSeek）
-        
+
         Returns:
             True 如果有可用的 API
         """
@@ -292,21 +342,21 @@ class ConfigUpdater:
             # 1. 加载当前配置
             config = self.load_current_config()
             scenarios = config.get("scenarios", {})
-            
+
             # 2. 增量更新：只修改 enabled 字段
             updated_count = 0
             for scene_key, scene_config in scenarios.items():
                 scene_name = scene_config.get("name", "")
                 should_enable = scene_name in selected_scenes
-                
+
                 # normal 场景特殊保护：始终保持 alert_level: low
                 if scene_key == "normal":
                     scene_config["alert_level"] = "low"
-                
+
                 if scene_config.get("enabled") != should_enable:
                     scene_config["enabled"] = should_enable
                     updated_count += 1
-            
+
             # 3. 检查是否有新场景需要添加
             existing_names = {s.get("name") for s in scenarios.values()}
             for scene_name in all_scenes:
@@ -319,15 +369,17 @@ class ConfigUpdater:
                     scenarios[scene_key] = new_config
                     updated_count += 1
                     print(f"  ➕ 新增场景: {scene_name}")
-            
+
             # 4. 保存配置
             config["scenarios"] = scenarios
             self.save_config(config)
-            
+
             if updated_count > 0:
-                enabled = [s.get("name") for s in scenarios.values() if s.get("enabled")]
+                enabled = [
+                    s.get("name") for s in scenarios.values() if s.get("enabled")
+                ]
                 print(f"✅ 场景配置已更新，启用: {', '.join(enabled)}")
-            
+
             return True
 
         except Exception as e:
@@ -342,25 +394,73 @@ class ConfigUpdater:
         """
         # 预定义模板
         templates = {
-            "跌倒检测": {"name": "跌倒检测", "prompt": "a person has fallen and is lying on the floor", "prompt_cn": "有人摔倒躺在地上", "threshold": 0.5, "cooldown": 30, "consecutive_frames": 2, "alert_level": "high"},
-            "火灾检测": {"name": "火灾检测", "prompt": "flames and fire burning with visible smoke", "prompt_cn": "发生火灾，有火焰和浓烟", "threshold": 0.5, "cooldown": 60, "consecutive_frames": 3, "alert_level": "high"},
-            "正常场景": {"name": "正常场景", "prompt": "an ordinary indoor room with no emergency", "prompt_cn": "普通室内环境，无异常", "threshold": 0.99, "cooldown": 10, "consecutive_frames": 1, "alert_level": "low"},
-            "摔倒": {"name": "跌倒检测", "prompt": "a person has fallen and is lying on the floor", "prompt_cn": "有人摔倒躺在地上", "threshold": 0.5, "cooldown": 30, "consecutive_frames": 2, "alert_level": "high"},
-            "起火": {"name": "火灾检测", "prompt": "flames and fire burning with visible smoke", "prompt_cn": "发生火灾，有火焰和浓烟", "threshold": 0.5, "cooldown": 60, "consecutive_frames": 3, "alert_level": "high"},
-            "正常": {"name": "正常场景", "prompt": "an ordinary indoor room with no emergency", "prompt_cn": "普通室内环境，无异常", "threshold": 0.99, "cooldown": 10, "consecutive_frames": 1, "alert_level": "low"},
+            "跌倒检测": {
+                "name": "跌倒检测",
+                "prompt": "a person has fallen and is lying on the floor",
+                "prompt_cn": "有人摔倒躺在地上",
+                "threshold": 0.5,
+                "cooldown": 30,
+                "consecutive_frames": 2,
+                "alert_level": "high",
+            },
+            "火灾检测": {
+                "name": "火灾检测",
+                "prompt": "flames and fire burning with visible smoke",
+                "prompt_cn": "发生火灾，有火焰和浓烟",
+                "threshold": 0.5,
+                "cooldown": 60,
+                "consecutive_frames": 3,
+                "alert_level": "high",
+            },
+            "正常场景": {
+                "name": "正常场景",
+                "prompt": "an ordinary indoor room with no emergency",
+                "prompt_cn": "普通室内环境，无异常",
+                "threshold": 0.99,
+                "cooldown": 10,
+                "consecutive_frames": 1,
+                "alert_level": "low",
+            },
+            "摔倒": {
+                "name": "跌倒检测",
+                "prompt": "a person has fallen and is lying on the floor",
+                "prompt_cn": "有人摔倒躺在地上",
+                "threshold": 0.5,
+                "cooldown": 30,
+                "consecutive_frames": 2,
+                "alert_level": "high",
+            },
+            "起火": {
+                "name": "火灾检测",
+                "prompt": "flames and fire burning with visible smoke",
+                "prompt_cn": "发生火灾，有火焰和浓烟",
+                "threshold": 0.5,
+                "cooldown": 60,
+                "consecutive_frames": 3,
+                "alert_level": "high",
+            },
+            "正常": {
+                "name": "正常场景",
+                "prompt": "an ordinary indoor room with no emergency",
+                "prompt_cn": "普通室内环境，无异常",
+                "threshold": 0.99,
+                "cooldown": 10,
+                "consecutive_frames": 1,
+                "alert_level": "low",
+            },
         }
-        
+
         if scene_name in templates:
             config = templates[scene_name].copy()
             config["enabled"] = enabled
             return config
-        
+
         # 尝试 AI 生成
         ai_config = self.generate_scene_with_ai(scene_name)
         if ai_config:
             ai_config["enabled"] = enabled
             return ai_config
-        
+
         # 默认配置
         return {
             "enabled": enabled,
@@ -562,7 +662,7 @@ class ConfigUpdater:
         self.GEMINI_API_KEY = api_key
         try:
             genai.configure(api_key=api_key)
-            self.gemini_model = genai.GenerativeModel('gemini-2.0-flash')
+            self.gemini_model = genai.GenerativeModel("gemini-3-flash-preview")
             self.current_api = "gemini"
             print("✓ Gemini API 初始化成功")
         except Exception as e:
@@ -643,7 +743,7 @@ class ConfigUpdater:
                         total_scenarios, is_normal
                     )
                     scene_config["threshold"] = new_threshold
-                    
+
                     # 确保 normal 场景的 alert_level 始终为 low
                     if is_normal:
                         scene_config["alert_level"] = "low"
@@ -655,6 +755,37 @@ class ConfigUpdater:
         except Exception as e:
             print(f"❌ 重新计算阈值失败: {e}")
             return False
+
+    def _extract_json(self, text: str) -> Optional[Dict[str, Any]]:
+        """从文本中提取 JSON"""
+        # 1. 尝试直接解析
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            pass
+
+        # 2. 尝试提取 markdown 代码块
+        if "```" in text:
+            try:
+                if "```json" in text:
+                    json_text = text.split("```json")[1].split("```")[0].strip()
+                else:
+                    json_text = text.split("```")[1].split("```")[0].strip()
+                return json.loads(json_text)
+            except (IndexError, json.JSONDecodeError):
+                pass
+
+        # 3. 尝试使用正则提取最外层的 {}
+        try:
+            start = text.find("{")
+            end = text.rfind("}")
+            if start != -1 and end != -1 and end > start:
+                json_text = text[start : end + 1]
+                return json.loads(json_text)
+        except json.JSONDecodeError:
+            pass
+
+        return None
 
     def generate_scene_with_ai(
         self, scene_name: str, total_scenarios: int = 3
@@ -719,15 +850,12 @@ class ConfigUpdater:
                 print(f"   ⚠️  AI 响应超时或失败，将使用默认配置")
                 return None
 
-            # 解析 JSON（处理可能的 markdown 代码块）
-            json_text = response_text
-            if "```json" in response_text:
-                json_text = response_text.split("```json")[1].split("```")[0].strip()
-            elif "```" in response_text:
-                json_text = response_text.split("```")[1].split("```")[0].strip()
-
             # 解析 JSON
-            config = json.loads(json_text)
+            config = self._extract_json(response_text)
+
+            if config is None:
+                print(f"   ⚠️  无法解析 AI 返回的 JSON 配置")
+                return None
 
             # 验证必要字段（threshold 不再由 Gemini 生成）
             required_fields = [
@@ -952,11 +1080,11 @@ class ConfigUpdater:
         if len(deletable_scenes) < len(scene_names):
             skipped = set(scene_names) - set(deletable_scenes)
             print(f"⚠️  跳过内置场景: {', '.join(skipped)}")
-        
+
         if not deletable_scenes:
             print("⚠️  没有可删除的场景")
             return False
-        
+
         try:
             # 1. 加载当前配置
             config = self.load_current_config()
@@ -974,7 +1102,7 @@ class ConfigUpdater:
                     # 跳过受保护的键（使用模块级常量）
                     if key in PROTECTED_SCENE_KEYS:
                         continue
-                        
+
                     if isinstance(value, dict):
                         config_name = value.get("name", "")
 
